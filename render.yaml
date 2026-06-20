@@ -1,0 +1,22 @@
+# Render blueprint for the FastAPI backend (an alternative to Railway).
+# The frontend deploys separately on Vercel (Root Directory: frontend).
+# Set the secret env vars in the Render dashboard — they are marked sync:false.
+services:
+  - type: web
+    name: ai-finance-insights-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

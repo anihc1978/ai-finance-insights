@@ -1,0 +1,23 @@
+# Python / backend
+backend/.venv/
+backend/venv/
+backend/.venv-check/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Secrets — NEVER commit real keys
+.env
+backend/.env
+frontend/.env
+
+# OS
+.DS_Store
+
+# TS incremental build cache
+*.tsbuildinfo
