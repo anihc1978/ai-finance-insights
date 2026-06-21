@@ -21,7 +21,6 @@ import time
 from datetime import datetime, timezone
 
 import httpx
-from bs4 import BeautifulSoup
 
 # --- upstream endpoints -----------------------------------------------------
 # PD04639PD = TC Sistema bancario SBS Compra, PD04640PD = Venta. We resolve which
@@ -114,24 +113,18 @@ def parse_bcrp(payload: dict) -> list[dict]:
 def parse_ocona(html: str) -> dict:
     """cuantoestaeldolar.pe/ocona HTML -> {compra, venta} (floats or None).
 
-    The page layout shifts, so we don't depend on a fixed selector: we look for
-    the compra/venta labels in the text and grab the nearest S/-style decimal
-    (e.g. 3.379). Anything we can't find comes back as None.
+    The page renders each currency's rate as numbers inside tags (e.g.
+    `>3.379</p>`), in the order: compra, a tiny day-change delta (~0.00x), then
+    venta. USD is the first currency on /ocona, so we take the first two
+    *rate-sized* numbers (filtering out the small deltas) as USD compra and
+    venta. Matching displayed `>NUMBER<` values avoids both the page's shifting
+    CSS-class selectors and the decimal coords buried in inline SVG paths.
     """
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(" ", strip=True)
-
-    def _near(label: str) -> float | None:
-        # Find "<label> ... 3.379" — first plausible PEN rate after the label.
-        m = re.search(label + r"[^0-9]{0,40}(\d\.\d{2,4})", text, re.IGNORECASE)
-        if m:
-            try:
-                return float(m.group(1))
-            except ValueError:
-                return None
-        return None
-
-    return {"compra": _near("compra"), "venta": _near("venta")}
+    nums = re.findall(r">([0-9]\.[0-9]{3,4})<", html)
+    rates = [float(n) for n in nums if float(n) >= 1.0]
+    if len(rates) >= 2:
+        return {"compra": rates[0], "venta": rates[1]}
+    return {"compra": None, "venta": None}
 
 
 # ===========================================================================
