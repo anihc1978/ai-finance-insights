@@ -15,11 +15,10 @@
 // ---------------------------------------------------------------------------
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { apiGet, apiPost, apiPut, apiUpload } from "../lib/api";
+import { apiGet, apiPost, apiUpload } from "../lib/api";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { BudgetsPanel } from "../components/BudgetsPanel";
 import { GoalsPanel } from "../components/GoalsPanel";
-import { CurrencySelector } from "../components/CurrencySelector";
 import { KpiCard } from "../components/KpiCard";
 import { CategoryDonut } from "../components/CategoryDonut";
 import { TrendArea } from "../components/TrendArea";
@@ -69,7 +68,10 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
-  const [currency, setCurrency] = useState<Currency>("USD");
+  // Display currency is fixed to soles (S/). We don't offer a global toggle —
+  // it only relabelled amounts (S/100 -> "$100") without converting, which was
+  // misleading. Each row still shows in its own currency via t.currency.
+  const currency: Currency = "PEN";
   // Which currency the next CSV import is denominated in (PEN by default,
   // matching the backend column default). Separate from the display currency.
   const [importCurrency, setImportCurrency] = useState<TxnCurrency>("PEN");
@@ -105,34 +107,12 @@ export function Dashboard() {
     setUserId(me.user_id);
   }
 
-  // Load the user's display-currency preference (the backend auto-creates the
-  // profile row with DEFAULT_CURRENCY when it's absent, so this always returns).
-  async function loadProfile() {
-    const p = await apiGet<{ currency: Currency }>("/profile");
-    setCurrency(p.currency);
-  }
-
-  // Persist a currency change immediately, then reflect it in the UI.
-  async function changeCurrency(next: Currency) {
-    setCurrency(next); // optimistic — money re-renders right away
-    try {
-      const p = await apiPut<{ currency: Currency }, { currency: Currency }>(
-        "/profile",
-        { currency: next },
-      );
-      setCurrency(p.currency);
-    } catch (err: unknown) {
-      setError(String(err));
-    }
-  }
-
-  // Load everything once on mount. Transactions first, then insights/me/profile.
+  // Load everything once on mount. Transactions first, then insights/me.
   useEffect(() => {
     (async () => {
       await loadTransactions();
       await loadInsights();
       await loadMe();
-      await loadProfile();
     })().catch((e: unknown) => setError(String(e)));
   }, []);
 
@@ -204,7 +184,6 @@ export function Dashboard() {
       >
         <h1 style={{ margin: 0, fontWeight: 500 }}>Panel</h1>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <CurrencySelector value={currency} onChange={changeCurrency} />
           <button onClick={signOut}>Cerrar sesión</button>
         </div>
       </header>
