@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { apiGet, apiPost, apiUpload } from "../lib/api";
+import { apiGet, apiPost, apiUpload, apiDelete } from "../lib/api";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { BudgetsPanel } from "../components/BudgetsPanel";
 import { GoalsPanel } from "../components/GoalsPanel";
@@ -27,6 +27,8 @@ import { WalletSplit } from "../components/WalletSplit";
 import { ConverterPanel } from "../components/ConverterPanel";
 import { ReceiptScanner } from "../components/ReceiptScanner";
 import { AfpPanel } from "../components/AfpPanel";
+import { SpendCalendar } from "../components/SpendCalendar";
+import { TransactionEditor } from "../components/TransactionEditor";
 import { tokens } from "../lib/theme";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 
@@ -54,6 +56,7 @@ interface Insights {
   monthOverMonth: { month: string; spend: number }[];
   narrative: string;
   flags: string[];
+  highlights: { title: string; detail: string }[];
   forecastNextMonth: number;
 }
 
@@ -76,6 +79,30 @@ export function Dashboard() {
   // matching the backend column default). Separate from the display currency.
   const [importCurrency, setImportCurrency] = useState<TxnCurrency>("PEN");
   const [tab, setTab] = useState<Tab>("overview");
+  // Manual add/edit editor: null = closed; otherwise the mode + the row being
+  // edited (undefined when adding a brand-new movement).
+  const [editor, setEditor] = useState<
+    { mode: "add" | "edit"; txn?: Transaction } | null
+  >(null);
+
+  // Delete a transaction, then refresh the table + insights.
+  async function handleDeleteTxn(id: string) {
+    setError(null);
+    try {
+      await apiDelete<{ deleted: boolean }>(`/transactions/${id}`);
+      await loadTransactions();
+      await loadInsights();
+    } catch (e: unknown) {
+      setError(String(e));
+    }
+  }
+
+  // Called by the editor after a successful add/edit: close + refresh.
+  async function handleEditorSaved() {
+    setEditor(null);
+    await loadTransactions();
+    await loadInsights();
+  }
 
   // Fetch the user's transactions (the generic types the response for us).
   async function loadTransactions() {
@@ -308,6 +335,9 @@ export function Dashboard() {
           {/* Two wallets: S/ total and US$ total side by side. */}
           <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
 
+          {/* Origin-style spend heatmap for the current month (soles). */}
+          <SpendCalendar transactions={txns} />
+
           {/* AI insight panels — only shown once the backend has data to analyze. */}
           {insights && (
             <>
@@ -369,18 +399,30 @@ export function Dashboard() {
                 />
               </div>
 
-              {/* Claude's narrative + flags. */}
+              {/* Claude's "Esto encontramos" highlights + narrative + flags. */}
               <InsightCard
                 narrative={insights.narrative}
                 flags={insights.flags}
+                highlights={insights.highlights ?? []}
               />
             </>
           )}
 
           <section style={{ marginTop: 24 }}>
-            <h3 style={{ fontWeight: 500 }}>
-              Tus movimientos ({txns.length})
-            </h3>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h3 style={{ fontWeight: 500 }}>
+                Tus movimientos ({txns.length})
+              </h3>
+              <button onClick={() => setEditor({ mode: "add" })}>
+                + Agregar movimiento
+              </button>
+            </div>
             {txns.length === 0 ? (
               <p style={{ color: tokens.colors.textMuted }}>
                 Aún no hay movimientos — importa un CSV arriba.
@@ -398,6 +440,7 @@ export function Dashboard() {
                     <th style={{ padding: 8 }}>Descripción</th>
                     <th style={{ padding: 8, textAlign: "right" }}>Monto</th>
                     <th style={{ padding: 8 }}>Categoría</th>
+                    <th style={{ padding: 8, textAlign: "right" }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -427,6 +470,25 @@ export function Dashboard() {
                         <td style={{ padding: 8, color: tokens.colors.textMuted }}>
                           {categoryLabel(t.category)}
                         </td>
+                        <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
+                          <button
+                            onClick={() => setEditor({ mode: "edit", txn: t })}
+                            style={{ fontSize: 12, padding: "2px 8px" }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTxn(t.id)}
+                            style={{
+                              fontSize: 12,
+                              padding: "2px 8px",
+                              marginLeft: 6,
+                              color: "crimson",
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -442,6 +504,27 @@ export function Dashboard() {
       {tab === "chat" && <ChatAssistant />}
       {tab === "budgets" && <BudgetsPanel currency={currency} />}
       {tab === "goals" && <GoalsPanel currency={currency} />}
+
+      {/* Manual add/edit modal — overlays the whole page. */}
+      {editor && (
+        <TransactionEditor
+          mode={editor.mode}
+          initial={
+            editor.txn
+              ? {
+                  id: editor.txn.id,
+                  date: editor.txn.date,
+                  description: editor.txn.description,
+                  amount: Number(editor.txn.amount),
+                  category: editor.txn.category,
+                  currency: editor.txn.currency,
+                }
+              : undefined
+          }
+          onSaved={handleEditorSaved}
+          onClose={() => setEditor(null)}
+        />
+      )}
     </div>
   );
 }

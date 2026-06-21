@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
+import { BudgetGauge } from "./BudgetGauge";
 
 interface BudgetsPanelProps {
   currency: Currency;
@@ -156,9 +157,20 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
     }
   }
 
+  // Totals across every category, for the overall budget gauge at the top.
+  const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
+  const totalLimit = budgets.reduce((sum, b) => sum + b.monthly_limit, 0);
+
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0 }}>Presupuestos</h3>
+
+      {/* Overall usage: total spent vs total limit across all categories */}
+      {totalLimit > 0 && (
+        <div style={{ display: "flex", justifyContent: "center", margin: "8px 0 20px" }}>
+          <BudgetGauge spent={totalSpent} limit={totalLimit} currency={currency} />
+        </div>
+      )}
 
       {/* Add / edit a limit */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

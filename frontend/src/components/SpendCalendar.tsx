@@ -1,0 +1,192 @@
+// src/components/SpendCalendar.tsx
+// ---------------------------------------------------------------------------
+// Origin-style spend heatmap for the CURRENT month. Each day cell shows the day
+// number plus that day's total SPEND in soles (sum of -amount for PEN rows on
+// that date), shaded as a teal heatmap — more spend = stronger fill. Empty days
+// stay faint. Weekday-aligned (Lun..Dom), with the Spanish month name + total.
+// Presentational only — caller passes the raw transactions.
+// ---------------------------------------------------------------------------
+import { tokens } from "../lib/theme";
+import { formatCurrency } from "../lib/format";
+
+interface SpendCalendarProps {
+  transactions: { date: string; amount: number; currency: string }[];
+}
+
+// Spanish weekday headers, Monday-first (matches the WA/Peru week layout).
+const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+const MONTH_NAMES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+// JS getDay(): 0=Sun..6=Sat. We want Monday-first (0=Mon..6=Sun) so the grid
+// lines up under the Lun..Dom headers.
+function mondayIndex(jsDay: number): number {
+  return (jsDay + 6) % 7;
+}
+
+export function SpendCalendar({ transactions }: SpendCalendarProps) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-based
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // How many blank cells before day 1 so the 1st sits under its weekday.
+  const leadingBlanks = mondayIndex(new Date(year, month, 1).getDay());
+
+  // Sum spend (positive number of soles) per day-of-month for PEN rows in the
+  // current month. amount is negative for spend, so we negate and keep only the
+  // outflows.
+  const spendByDay: Record<number, number> = {};
+  for (const t of transactions) {
+    if (t.currency !== "PEN") continue;
+    const amount = Number(t.amount);
+    if (amount >= 0) continue; // income/transfers in — not spend
+    // Parse "YYYY-MM-DD" without timezone drift.
+    const [ty, tm, td] = t.date.split("-").map(Number);
+    if (ty !== year || tm !== month + 1 || !td) continue;
+    spendByDay[td] = (spendByDay[td] ?? 0) + -amount;
+  }
+
+  const monthTotal = Object.values(spendByDay).reduce((s, v) => s + v, 0);
+  const maxDay = Math.max(0, ...Object.values(spendByDay));
+
+  // Heatmap fill: stronger teal for bigger spend. Returns a background colour.
+  function cellBg(spend: number): string {
+    if (spend <= 0) return tokens.colors.surface;
+    const ratio = maxDay > 0 ? spend / maxDay : 0;
+    // 0.15..1.0 alpha so even small spends are visible but the biggest is solid.
+    const alpha = 0.15 + ratio * 0.85;
+    return `rgba(29, 158, 117, ${alpha.toFixed(2)})`; // accent teal #1D9E75
+  }
+
+  // White text once the teal gets dark enough to keep the day number readable.
+  function cellText(spend: number): string {
+    if (spend <= 0) return tokens.colors.textMuted;
+    const ratio = maxDay > 0 ? spend / maxDay : 0;
+    return ratio > 0.55 ? "#FFFFFF" : tokens.colors.text;
+  }
+
+  // Build the cell list: leading blanks then each day.
+  const cells: ({ day: number; spend: number } | null)[] = [];
+  for (let i = 0; i < leadingBlanks; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, spend: spendByDay[d] ?? 0 });
+  }
+
+  return (
+    <section
+      style={{
+        marginTop: tokens.spacing.lg,
+        padding: tokens.spacing.md,
+        background: tokens.colors.cardBg,
+        border: `1px solid ${tokens.colors.border}`,
+        borderRadius: tokens.radii.card,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: tokens.spacing.md,
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 15,
+            fontWeight: 500,
+            color: tokens.colors.text,
+            textTransform: "capitalize",
+          }}
+        >
+          {MONTH_NAMES[month]} {year}
+        </h3>
+        <span style={{ fontSize: 14, fontWeight: 500, color: tokens.colors.accent }}>
+          {formatCurrency(monthTotal, "PEN")}
+        </span>
+      </div>
+
+      {/* Weekday headers */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: 6,
+          marginBottom: 6,
+        }}
+      >
+        {WEEKDAYS.map((w) => (
+          <div
+            key={w}
+            style={{
+              textAlign: "center",
+              fontSize: 11,
+              fontWeight: 500,
+              color: tokens.colors.textMuted,
+            }}
+          >
+            {w}
+          </div>
+        ))}
+      </div>
+
+      {/* Day grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: 6,
+        }}
+      >
+        {cells.map((cell, i) => {
+          if (!cell) {
+            return <div key={`blank-${i}`} />;
+          }
+          const hasSpend = cell.spend > 0;
+          return (
+            <div
+              key={cell.day}
+              title={
+                hasSpend
+                  ? `${cell.day}: ${formatCurrency(cell.spend, "PEN")}`
+                  : `${cell.day}: sin gasto`
+              }
+              style={{
+                minHeight: 56,
+                padding: 6,
+                borderRadius: tokens.radii.input,
+                background: cellBg(cell.spend),
+                border: `1px solid ${tokens.colors.border}`,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                color: cellText(cell.spend),
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 500 }}>{cell.day}</span>
+              {hasSpend && (
+                <span style={{ fontSize: 11, fontWeight: 500 }}>
+                  {formatCurrency(cell.spend, "PEN")}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}

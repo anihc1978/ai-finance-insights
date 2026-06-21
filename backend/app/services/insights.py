@@ -23,7 +23,14 @@ _NARRATIVE_SYSTEM = (
     "anomalías (subidas inusuales), probables suscripciones y cualquier salto de un mes a "
     "otro. Usa el símbolo 'S/' para los soles peruanos. Sé específico con los nombres de "
     "las categorías y los montos aproximados. NO des consejos de inversión. "
-    'Responde ÚNICAMENTE como JSON: {"narrative": str, "flags": [str, ...]}. Sin markdown.'
+    "Además, incluye 'highlights': exactamente 3 puntos cortos (estilo 'Esto encontramos'), "
+    "cada uno con un título breve y un detalle de una línea, en español peruano natural y "
+    "con tono cercano. El primero sobre los ingresos, el segundo sobre los gastos y el "
+    'tercero sobre el margen o ahorro. Por ejemplo: {"title": "Ingresos estables", '
+    '"detail": "Ganas alrededor de S/ X al mes."}. '
+    "Responde ÚNICAMENTE como JSON: "
+    '{"narrative": str, "flags": [str, ...], "highlights": [{"title": str, "detail": str}, ...]}. '
+    "Sin markdown."
 )
 
 
@@ -37,8 +44,10 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-async def _narrative_and_flags(month: str, agg: dict, forecast: float) -> tuple[str, list[str]]:
-    """One Claude call that turns the aggregated numbers into prose + flags."""
+async def _narrative_and_flags(
+    month: str, agg: dict, forecast: float
+) -> tuple[str, list[str], list[dict]]:
+    """One Claude call that turns the aggregated numbers into prose + flags + highlights."""
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     summary_payload = {
         "month": month,
@@ -65,11 +74,17 @@ async def _narrative_and_flags(month: str, agg: dict, forecast: float) -> tuple[
         parsed = json.loads(_strip_fences(text))
         narrative = str(parsed.get("narrative", "")).strip()
         flags = [str(f) for f in parsed.get("flags", []) if str(f).strip()]
+        highlights = [
+            {"title": str(h.get("title", "")).strip(), "detail": str(h.get("detail", "")).strip()}
+            for h in parsed.get("highlights", [])
+            if isinstance(h, dict) and str(h.get("title", "")).strip()
+        ]
     except json.JSONDecodeError:
-        # Degrade gracefully: use the raw text as the narrative, no flags.
+        # Degrade gracefully: use the raw text as the narrative, no flags/highlights.
         narrative = _strip_fences(text)
         flags = []
-    return narrative, flags
+        highlights = []
+    return narrative, flags, highlights
 
 
 async def build_insight(transactions: list[dict], month: str) -> dict:
@@ -77,7 +92,7 @@ async def build_insight(transactions: list[dict], month: str) -> dict:
     agg = aggregate(transactions, month)
     monthly_spend = [row["spend"] for row in agg["monthOverMonth"]]
     forecast = forecast_next_month(monthly_spend)
-    narrative, flags = await _narrative_and_flags(month, agg, forecast)
+    narrative, flags, highlights = await _narrative_and_flags(month, agg, forecast)
 
     return {
         "month": month,
@@ -87,5 +102,6 @@ async def build_insight(transactions: list[dict], month: str) -> dict:
         "monthOverMonth": agg["monthOverMonth"],
         "narrative": narrative,
         "flags": flags,
+        "highlights": highlights,
         "forecastNextMonth": forecast,
     }

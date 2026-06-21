@@ -75,23 +75,113 @@ async def import_transactions(
     """
     currency = currency if currency in ("PEN", "USD") else "PEN"
 
-    contents = await file.read()                       # raw bytes of the uploaded CSV
-    df = pd.read_csv(io.BytesIO(contents), dtype=str)  # parse; dtype=str keeps values JSON-safe
+    contents = await file.read()  # raw bytes of the uploaded CSV
+    try:
+        df = pd.read_csv(io.BytesIO(contents), dtype=str)  # dtype=str keeps values JSON-safe
+        rows = [
+            {
+                "user_id": user.id,
+                "date": str(r["date"]),
+                "description": str(r["description"]),
+                "amount": float(r["amount"]),
+                "currency": currency,
+                "raw": r.to_dict(),
+            }
+            for _, r in df.iterrows()
+        ]
+    except (KeyError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+        # A bad/empty CSV or a non-numeric amount shouldn't 500 — tell the user.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No pudimos leer el CSV. Verifica que tenga las columnas date, description y amount.",
+        ) from exc
 
-    rows = [
-        {
-            "user_id": user.id,
-            "date": str(r["date"]),
-            "description": str(r["description"]),
-            "amount": float(r["amount"]),
-            "currency": currency,
-            "raw": r.to_dict(),
-        }
-        for _, r in df.iterrows()
-    ]
+    if not rows:
+        return {"imported": 0}
 
     user_client(user.token).table("transactions").insert(rows).execute()
     return {"imported": len(rows)}
+
+
+class TransactionBody(BaseModel):
+    date: str
+    description: str
+    amount: float
+    category: str | None = None
+    currency: str | None = None
+
+
+class TransactionPatchBody(BaseModel):
+    date: str | None = None
+    description: str | None = None
+    amount: float | None = None
+    category: str | None = None
+    currency: str | None = None
+
+
+@app.post("/transactions")
+def create_transaction(body: TransactionBody, user: CurrentUser = Depends(get_current_user)):
+    """Add one transaction manually (negative amount = gasto, positive = ingreso).
+
+    Currency is coerced to PEN unless USD is explicitly given, matching the import
+    route, so a bad value can never write an invalid currency.
+    """
+    currency = body.currency if body.currency == "USD" else "PEN"
+    res = (
+        user_client(user.token)
+        .table("transactions")
+        .insert(
+            {
+                "user_id": user.id,
+                "date": body.date,
+                "description": body.description,
+                "amount": body.amount,
+                "category": body.category,
+                "currency": currency,
+                "raw": {"source": "manual"},
+            }
+        )
+        .execute()
+    )
+    return {"transaction": res.data[0]}
+
+
+@app.patch("/transactions/{txn_id}")
+def update_transaction(
+    txn_id: str,
+    body: TransactionPatchBody,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Update any of a transaction's editable fields. 404 if it doesn't exist."""
+    updates = body.model_dump(exclude_unset=True)
+    if "currency" in updates:
+        updates["currency"] = updates["currency"] if updates["currency"] == "USD" else "PEN"
+    if not updates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update",
+        )
+
+    res = (
+        user_client(user.token)
+        .table("transactions")
+        .update(updates)
+        .eq("id", txn_id)
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction not found",
+        )
+    return {"transaction": res.data[0]}
+
+
+@app.delete("/transactions/{txn_id}")
+def delete_transaction(txn_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Remove one transaction."""
+    user_client(user.token).table("transactions").delete().eq("id", txn_id).execute()
+    return {"deleted": True}
 
 
 @app.get("/transactions")
