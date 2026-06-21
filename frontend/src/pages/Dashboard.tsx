@@ -26,6 +26,8 @@ import { TrendArea } from "../components/TrendArea";
 import { InsightCard } from "../components/InsightCard";
 import { WalletSplit } from "../components/WalletSplit";
 import { ConverterPanel } from "../components/ConverterPanel";
+import { ReceiptScanner } from "../components/ReceiptScanner";
+import { AfpPanel } from "../components/AfpPanel";
 import { tokens } from "../lib/theme";
 import { formatCurrency, type Currency } from "../lib/format";
 
@@ -57,7 +59,7 @@ interface Insights {
 }
 
 // The simple tabbed layout that holds the overview vs. the new feature panels.
-type Tab = "overview" | "cambio" | "chat" | "budgets" | "goals";
+type Tab = "overview" | "cambio" | "afp" | "chat" | "budgets" | "goals";
 
 export function Dashboard() {
   const { session, signOut } = useAuth();
@@ -311,6 +313,17 @@ export function Dashboard() {
                 {categorizing ? "Categorizing…" : "Categorize with AI"}
               </button>
             </div>
+
+            {/* Scan Yape/Plin receipt screenshots → AI extracts transactions. */}
+            <div
+              style={{
+                marginTop: tokens.spacing.lg,
+                paddingTop: tokens.spacing.lg,
+                borderTop: `1px solid ${tokens.colors.border}`,
+              }}
+            >
+              <ReceiptScanner onImported={loadTransactions} />
+            </div>
           </section>
 
           {/* Two wallets: S/ total and US$ total side by side. */}
@@ -446,6 +459,7 @@ export function Dashboard() {
       )}
 
       {tab === "cambio" && <ConverterPanel />}
+      {tab === "afp" && <AfpPanel currency={currency} />}
       {tab === "chat" && <ChatAssistant />}
       {tab === "budgets" && <BudgetsPanel currency={currency} />}
       {tab === "goals" && <GoalsPanel currency={currency} />}
@@ -479,6 +493,7 @@ function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "cambio", label: "Cambio" },
+  { id: "afp", label: "AFP" },
   { id: "chat", label: "Chat" },
   { id: "budgets", label: "Budgets" },
   { id: "goals", label: "Goals" },

@@ -27,10 +27,12 @@ from app.services.budgets import (
     average_monthly_spend_by_category,
     spend_by_category_for_month,
 )
+from app.services.afp import scan_afp
 from app.services.categorizer import categorize
 from app.services.chat import build_chat_reply
 from app.services.fx import get_official_history, get_rates
 from app.services.insights import build_insight
+from app.services.scanner import scan_receipt
 
 app = FastAPI(title="AI Finance Insights API")
 
@@ -241,6 +243,15 @@ class GoalPatchBody(BaseModel):
     target_date: str | None = None
 
 
+class AfpBody(BaseModel):
+    as_of: str
+    balance: float
+    fund_type: str | None = None
+    contributed: float | None = None
+    afp_name: str | None = None
+    source: str | None = None
+
+
 @app.get("/profile")
 def get_profile(user: CurrentUser = Depends(get_current_user)):
     """Return the user's display currency, creating the row (default USD) if absent."""
@@ -449,4 +460,174 @@ def update_goal(
 def delete_goal(goal_id: str, user: CurrentUser = Depends(get_current_user)):
     """Remove a savings goal."""
     user_client(user.token).table("goals").delete().eq("id", goal_id).execute()
+    return {"deleted": True}
+
+
+# ---------------------------------------------------------------------------
+# Peru: Claude-vision capture. Yape/Plin receipt screenshots become PEN
+# transactions (deduped by Yape/Plin operation id), and AFP (private-pension)
+# paper statements become afp_records the user reviews before saving.
+# ---------------------------------------------------------------------------
+
+# Image content types the vision services accept; anything else falls back to PNG.
+_SCAN_MEDIA_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+_MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MB per uploaded image
+_MAX_SCAN_FILES = 25                 # max receipts per /scan-receipts request
+
+
+@app.post("/scan-receipts")
+async def scan_receipts(
+    files: list[UploadFile] = File(...),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Scan one or more Yape/Plin receipt screenshots into PEN transactions.
+
+    Each image is read by Claude vision (scan_receipt) into a {amount, direction,
+    counterparty, ...} dict, turned into a transaction row (amount negative when
+    money was sent), and deduped against the user's existing transactions by the
+    Yape/Plin operation id so re-uploading the same screenshot can't double-count.
+    """
+    if len(files) > _MAX_SCAN_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Demasiados archivos (máximo {_MAX_SCAN_FILES} por carga).",
+        )
+
+    client = user_client(user.token)
+
+    # Dedupe (best-effort): skip a scanned receipt already stored — by Yape/Plin
+    # operation id when present, else by (date, amount, counterparty).
+    existing = (
+        client.table("transactions").select("id, date, amount, raw").execute().data or []
+    )
+    seen_ops = {
+        (r.get("raw") or {}).get("operation_id")
+        for r in existing
+        if (r.get("raw") or {}).get("operation_id")
+    }
+    seen_keys = {
+        (r.get("date"), round(float(r.get("amount") or 0), 2), (r.get("raw") or {}).get("counterparty"))
+        for r in existing
+    }
+
+    rows: list[dict] = []
+    items: list[dict] = []
+    skipped = 0
+
+    for file in files:
+        if file.size and file.size > _MAX_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Imagen demasiado grande (máximo 8 MB).",
+            )
+        contents = await file.read()
+        media_type = file.content_type if file.content_type in _SCAN_MEDIA_TYPES else "image/png"
+
+        receipt = await scan_receipt(contents, media_type)
+        if not receipt or receipt.get("amount") is None:
+            continue
+
+        magnitude = abs(float(receipt["amount"]))
+        amount = -magnitude if receipt.get("direction") == "enviado" else magnitude
+        operation_id = receipt.get("operation_id")
+        key = (receipt.get("date"), round(amount, 2), receipt.get("counterparty"))
+
+        if (operation_id and operation_id in seen_ops) or (not operation_id and key in seen_keys):
+            skipped += 1
+            continue
+        if operation_id:
+            seen_ops.add(operation_id)  # also dedupe within this same batch
+        seen_keys.add(key)
+
+        rows.append(
+            {
+                "user_id": user.id,
+                "date": receipt.get("date"),
+                "description": receipt.get("counterparty") or receipt.get("description") or "Yape/Plin",
+                "amount": amount,
+                "category": None,
+                "currency": "PEN",
+                "raw": {
+                    "source": "yape_plin_scan",
+                    "operation_id": operation_id,
+                    "wallet": receipt.get("wallet"),
+                    "counterparty": receipt.get("counterparty"),
+                    "direction": receipt.get("direction"),
+                },
+            }
+        )
+        items.append(
+            {
+                "amount": amount,
+                "description": receipt.get("counterparty") or receipt.get("description") or "Yape/Plin",
+                "date": receipt.get("date"),
+                "wallet": receipt.get("wallet"),
+            }
+        )
+
+    if rows:
+        client.table("transactions").insert(rows).execute()
+
+    return {"imported": len(rows), "skipped_duplicates": skipped, "items": items}
+
+
+@app.post("/afp/scan")
+async def afp_scan(
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Read one AFP estado-de-cuenta image into a draft record (NOT saved).
+
+    Returns the extracted {as_of, balance, fund_type, contributed, afp_name} so
+    the UI can review/correct it before POSTing to /afp.
+    """
+    if file.size and file.size > _MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Imagen demasiado grande (máximo 8 MB).",
+        )
+    contents = await file.read()
+    media_type = file.content_type if file.content_type in _SCAN_MEDIA_TYPES else "image/png"
+    return await scan_afp(contents, media_type)
+
+
+@app.get("/afp")
+def get_afp(user: CurrentUser = Depends(get_current_user)):
+    """Return the user's AFP records, oldest first (for the balance-over-time chart)."""
+    res = (
+        user_client(user.token)
+        .table("afp_records")
+        .select("id, as_of, balance, fund_type, contributed, afp_name, source")
+        .order("as_of", desc=False)
+        .execute()
+    )
+    return {"records": res.data}
+
+
+@app.post("/afp")
+def create_afp(body: AfpBody, user: CurrentUser = Depends(get_current_user)):
+    """Save one AFP record (from the scan review form or manual entry)."""
+    res = (
+        user_client(user.token)
+        .table("afp_records")
+        .insert(
+            {
+                "user_id": user.id,
+                "as_of": body.as_of,
+                "balance": body.balance,
+                "fund_type": body.fund_type,
+                "contributed": body.contributed,
+                "afp_name": body.afp_name,
+                "source": body.source or "manual",
+            }
+        )
+        .execute()
+    )
+    return {"record": res.data[0]}
+
+
+@app.delete("/afp/{record_id}")
+def delete_afp(record_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Remove one AFP record."""
+    user_client(user.token).table("afp_records").delete().eq("id", record_id).execute()
     return {"deleted": True}

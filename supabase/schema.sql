@@ -115,3 +115,21 @@ create policy "own goals - all" on public.goals for all
 alter table public.transactions
   add column if not exists currency text not null default 'PEN'
   check (currency in ('PEN','USD'));
+
+-- ---- afp_records: track AFP (Peru private pension) balance over time ---------
+create table if not exists public.afp_records (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  as_of        date not null,                 -- statement date
+  balance      numeric(14,2) not null,        -- saldo / fondo acumulado (S/)
+  fund_type    text,                          -- Fondo 0 / 1 / 2 / 3
+  contributed  numeric(14,2),                 -- aporte del periodo
+  afp_name     text,                          -- Integra / Prima / Profuturo / Habitat
+  source       text not null default 'manual',-- manual | scan
+  created_at   timestamptz not null default now()
+);
+
+alter table public.afp_records enable row level security;
+drop policy if exists "own afp - all" on public.afp_records;
+create policy "own afp - all" on public.afp_records for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
