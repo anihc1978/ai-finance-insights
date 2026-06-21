@@ -3,13 +3,14 @@
 // A prominent card showing the pure-Python projection of next month's spend.
 // Presentational only: one number in, one nicely-formatted card out.
 // ---------------------------------------------------------------------------
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, type Currency } from "../lib/format";
 
 interface ForecastCardProps {
   value: number;
+  currency?: Currency;
 }
 
-export function ForecastCard({ value }: ForecastCardProps) {
+export function ForecastCard({ value, currency }: ForecastCardProps) {
   return (
     <section
       style={{
@@ -24,7 +25,7 @@ export function ForecastCard({ value }: ForecastCardProps) {
         Projected next-month spend
       </p>
       <p style={{ margin: "4px 0 0", fontSize: 32, fontWeight: 700 }}>
-        {formatCurrency(value)}
+        {formatCurrency(value, currency)}
       </p>
     </section>
   );

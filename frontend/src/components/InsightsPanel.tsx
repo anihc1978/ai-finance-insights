@@ -3,13 +3,14 @@
 // Renders Claude's plain-English narrative, the totals (income/spend), and any
 // anomaly/subscription flags it surfaced. Presentational only.
 // ---------------------------------------------------------------------------
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, type Currency } from "../lib/format";
 
 interface InsightsPanelProps {
   narrative: string;
   flags: string[];
   totalSpend: number;
   totalIncome: number;
+  currency?: Currency;
 }
 
 const cardStyle: React.CSSProperties = {
@@ -24,6 +25,7 @@ export function InsightsPanel({
   flags,
   totalSpend,
   totalIncome,
+  currency,
 }: InsightsPanelProps) {
   return (
     <section style={cardStyle}>
@@ -33,11 +35,11 @@ export function InsightsPanel({
       <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
         <span>
           Total income:{" "}
-          <strong style={{ color: "green" }}>{formatCurrency(totalIncome)}</strong>
+          <strong style={{ color: "green" }}>{formatCurrency(totalIncome, currency)}</strong>
         </span>
         <span>
           Total spend:{" "}
-          <strong style={{ color: "crimson" }}>{formatCurrency(totalSpend)}</strong>
+          <strong style={{ color: "crimson" }}>{formatCurrency(totalSpend, currency)}</strong>
         </span>
       </div>
 

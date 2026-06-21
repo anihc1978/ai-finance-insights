@@ -4,16 +4,31 @@ AI Finance Insights — FastAPI entrypoint.
 Run locally:  uvicorn app.main:app --reload --port 8000
 """
 import io
+import json
+from datetime import datetime
 
 import pandas as pd
+from anthropic import AsyncAnthropic
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, status
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import get_current_user, CurrentUser
-from app.config import settings
+from app.config import (
+    CURRENCY_SYMBOLS,
+    DEFAULT_CURRENCY,
+    INSIGHTS_MODEL,
+    SUPPORTED_CURRENCIES,
+    settings,
+)
 from app.db import user_client
 from app.services.aggregate import latest_month_with_data
+from app.services.budgets import (
+    average_monthly_spend_by_category,
+    spend_by_category_for_month,
+)
 from app.services.categorizer import categorize
+from app.services.chat import build_chat_reply
 from app.services.insights import build_insight
 
 app = FastAPI(title="AI Finance Insights API")
@@ -158,3 +173,248 @@ async def get_insights(
         pass
 
     return insight
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: profile (display currency), AI chat, budgets, and savings goals.
+# Same conventions as above — every route is auth-guarded and talks to the DB
+# through user_client(user.token), so RLS scopes all reads/writes to the caller.
+# ---------------------------------------------------------------------------
+
+
+class ProfileBody(BaseModel):
+    currency: str
+
+
+class ChatBody(BaseModel):
+    message: str
+    history: list[dict] = []
+
+
+class BudgetBody(BaseModel):
+    category: str
+    monthly_limit: float
+
+
+class GoalBody(BaseModel):
+    name: str
+    target_amount: float
+    target_date: str | None = None
+
+
+class GoalPatchBody(BaseModel):
+    name: str | None = None
+    target_amount: float | None = None
+    saved_amount: float | None = None
+    target_date: str | None = None
+
+
+@app.get("/profile")
+def get_profile(user: CurrentUser = Depends(get_current_user)):
+    """Return the user's display currency, creating the row (default USD) if absent."""
+    client = user_client(user.token)
+    rows = client.table("profiles").select("currency").eq("user_id", user.id).execute().data or []
+    if rows:
+        return {"currency": rows[0]["currency"]}
+
+    client.table("profiles").insert(
+        {"user_id": user.id, "currency": DEFAULT_CURRENCY}
+    ).execute()
+    return {"currency": DEFAULT_CURRENCY}
+
+
+@app.put("/profile")
+def update_profile(body: ProfileBody, user: CurrentUser = Depends(get_current_user)):
+    """Set the user's display currency (must be in SUPPORTED_CURRENCIES)."""
+    if body.currency not in SUPPORTED_CURRENCIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported currency: {body.currency}",
+        )
+
+    user_client(user.token).table("profiles").upsert(
+        {"user_id": user.id, "currency": body.currency},
+        on_conflict="user_id",
+    ).execute()
+    return {"currency": body.currency}
+
+
+@app.post("/chat")
+async def chat(body: ChatBody, user: CurrentUser = Depends(get_current_user)):
+    """Conversational money assistant: a Claude tool-use loop over the user's data."""
+    client = user_client(user.token)
+
+    rows = client.table("profiles").select("currency").eq("user_id", user.id).execute().data or []
+    currency = rows[0]["currency"] if rows else DEFAULT_CURRENCY
+
+    return await build_chat_reply(client, currency, body.message, body.history)
+
+
+@app.get("/budgets")
+def get_budgets(user: CurrentUser = Depends(get_current_user)):
+    """Per-category monthly limits with spend-so-far for the CURRENT calendar month."""
+    client = user_client(user.token)
+
+    budgets = (
+        client.table("budgets").select("category, monthly_limit").execute().data or []
+    )
+    txns = (
+        client.table("transactions").select("date, amount, category").execute().data or []
+    )
+
+    this_month = datetime.now().strftime("%Y-%m")
+    spent = spend_by_category_for_month(txns, this_month)
+
+    return {
+        "budgets": [
+            {
+                "category": b["category"],
+                "monthly_limit": float(b["monthly_limit"]),
+                "spent": spent.get(b["category"], 0.0),
+            }
+            for b in budgets
+        ]
+    }
+
+
+@app.put("/budgets")
+def upsert_budget(body: BudgetBody, user: CurrentUser = Depends(get_current_user)):
+    """Create or update the monthly limit for a category."""
+    user_client(user.token).table("budgets").upsert(
+        {"user_id": user.id, "category": body.category, "monthly_limit": body.monthly_limit},
+        on_conflict="user_id,category",
+    ).execute()
+    return {"category": body.category, "monthly_limit": body.monthly_limit}
+
+
+@app.delete("/budgets/{category}")
+def delete_budget(category: str, user: CurrentUser = Depends(get_current_user)):
+    """Remove the budget for one category."""
+    user_client(user.token).table("budgets").delete().eq("category", category).execute()
+    return {"deleted": True}
+
+
+@app.post("/budgets/suggest")
+async def suggest_budgets(user: CurrentUser = Depends(get_current_user)):
+    """AI Budget Builder: average monthly spend per category, refined by Claude.
+
+    The averages are deterministic Python; Claude only nudges them to friendlier
+    round numbers. Any JSON trouble falls back to the raw computed averages so the
+    caller always gets usable suggestions.
+    """
+    client = user_client(user.token)
+    txns = (
+        client.table("transactions").select("date, amount, category").execute().data or []
+    )
+
+    averages = average_monthly_spend_by_category(txns)
+    if not averages:
+        return {"suggestions": []}
+
+    fallback = [
+        {"category": c, "suggested_limit": round(a, 2)} for c, a in averages.items()
+    ]
+
+    try:
+        anthropic = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        message = await anthropic.messages.create(
+            model=INSIGHTS_MODEL,
+            max_tokens=1024,
+            system=(
+                "You are a personal-budgeting assistant. Given a user's average monthly "
+                "spend per category, suggest a sensible monthly budget limit for each — "
+                "usually a clean round number at or slightly below the average to encourage "
+                "saving. Keep every category from the input. Respond ONLY as JSON: "
+                '{"suggestions": [{"category": str, "suggested_limit": number}, ...]}. '
+                "No prose, no markdown."
+            ),
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Average monthly spend by category:\n\n"
+                    + json.dumps(averages, ensure_ascii=False),
+                }
+            ],
+        )
+        text = "".join(block.text for block in message.content if block.type == "text").strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text
+            if text.endswith("```"):
+                text = text[: text.rfind("```")]
+        parsed = json.loads(text.strip())
+        suggestions = [
+            {"category": str(s["category"]), "suggested_limit": float(s["suggested_limit"])}
+            for s in parsed.get("suggestions", [])
+            if s.get("category") and s.get("suggested_limit") is not None
+        ]
+        return {"suggestions": suggestions or fallback}
+    except Exception:
+        return {"suggestions": fallback}
+
+
+@app.get("/goals")
+def get_goals(user: CurrentUser = Depends(get_current_user)):
+    """Return the user's savings goals."""
+    res = (
+        user_client(user.token)
+        .table("goals")
+        .select("id, name, target_amount, saved_amount, target_date")
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return {"goals": res.data}
+
+
+@app.post("/goals")
+def create_goal(body: GoalBody, user: CurrentUser = Depends(get_current_user)):
+    """Create a savings goal (saved_amount starts at 0 per the schema default)."""
+    res = (
+        user_client(user.token)
+        .table("goals")
+        .insert(
+            {
+                "user_id": user.id,
+                "name": body.name,
+                "target_amount": body.target_amount,
+                "target_date": body.target_date,
+            }
+        )
+        .execute()
+    )
+    return {"goal": res.data[0]}
+
+
+@app.patch("/goals/{goal_id}")
+def update_goal(
+    goal_id: str,
+    body: GoalPatchBody,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Update any of a goal's fields (e.g. add to savings). 404 if it doesn't exist."""
+    updates = body.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update",
+        )
+
+    res = (
+        user_client(user.token)
+        .table("goals")
+        .update(updates)
+        .eq("id", goal_id)
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Goal not found",
+        )
+    return {"goal": res.data[0]}
+
+
+@app.delete("/goals/{goal_id}")
+def delete_goal(goal_id: str, user: CurrentUser = Depends(get_current_user)):
+    """Remove a savings goal."""
+    user_client(user.token).table("goals").delete().eq("id", goal_id).execute()
+    return {"deleted": True}

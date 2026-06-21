@@ -45,3 +45,10 @@ CATEGORIES = [
     "Entertainment", "Health", "Travel", "Subscriptions", "Income",
     "Transfers", "Other",
 ]
+
+# Multi-currency support. The stored amounts are plain numbers; currency is a
+# per-user display preference (profiles.currency). Symbols are passed to Claude
+# so AI narratives/answers render amounts correctly.
+SUPPORTED_CURRENCIES = ["USD", "AUD", "PEN"]
+DEFAULT_CURRENCY = "USD"
+CURRENCY_SYMBOLS = {"USD": "$", "AUD": "A$", "PEN": "S/"}

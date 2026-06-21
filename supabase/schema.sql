@@ -62,3 +62,51 @@ create policy "own insights - all"
   on public.insights for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- profiles · budgets · goals  (Phase 2 features)
+-- ============================================================================
+
+-- ---- profiles: per-user settings (display currency) ------------------------
+create table if not exists public.profiles (
+  user_id     uuid primary key references auth.users(id) on delete cascade,
+  currency    text not null default 'USD' check (currency in ('USD','AUD','PEN')),
+  created_at  timestamptz not null default now()
+);
+
+-- ---- budgets: per-category monthly spending limits -------------------------
+create table if not exists public.budgets (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  category      text not null,
+  monthly_limit numeric(12,2) not null,
+  created_at    timestamptz not null default now(),
+  unique (user_id, category)
+);
+
+-- ---- goals: savings goals --------------------------------------------------
+create table if not exists public.goals (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  name          text not null,
+  target_amount numeric(12,2) not null,
+  saved_amount  numeric(12,2) not null default 0,
+  target_date   date,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+alter table public.budgets  enable row level security;
+alter table public.goals    enable row level security;
+
+drop policy if exists "own profile - all" on public.profiles;
+create policy "own profile - all" on public.profiles for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own budgets - all" on public.budgets;
+create policy "own budgets - all" on public.budgets for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own goals - all" on public.goals;
+create policy "own goals - all" on public.goals for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);

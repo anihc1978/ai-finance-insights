@@ -63,6 +63,59 @@ export async function apiPost<TBody, TResponse>(
   return (await res.json()) as TResponse;
 }
 
+/** Same idea for PUT, with a typed body (used for upserts: profile, budgets). */
+export async function apiPut<TBody, TResponse>(
+  path: string,
+  body: TBody,
+): Promise<TResponse> {
+  const token = await getToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as TResponse;
+}
+
+/** Same idea for PATCH, with a typed (usually partial) body. */
+export async function apiPatch<TBody, TResponse>(
+  path: string,
+  body: TBody,
+): Promise<TResponse> {
+  const token = await getToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as TResponse;
+}
+
+/** DELETE a resource; returns the typed JSON body the API sends back. */
+export async function apiDelete<TResponse>(path: string): Promise<TResponse> {
+  const token = await getToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as TResponse;
+}
+
 /**
  * apiUpload<T> — POST a file as multipart/form-data (used for CSV import).
  * IMPORTANT: we do NOT set Content-Type — when the body is a FormData, the

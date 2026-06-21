@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatCurrency, formatMonthLabel } from "../lib/format";
+import { formatCurrency, formatMonthLabel, type Currency } from "../lib/format";
 
 // Matches the /insights contract's "monthOverMonth" row shape.
 interface MonthSpend {
@@ -22,6 +22,7 @@ interface MonthSpend {
 
 interface MonthOverMonthProps {
   data: MonthSpend[];
+  currency?: Currency;
 }
 
 const cardStyle: React.CSSProperties = {
@@ -31,7 +32,7 @@ const cardStyle: React.CSSProperties = {
   borderRadius: 8,
 };
 
-export function MonthOverMonth({ data }: MonthOverMonthProps) {
+export function MonthOverMonth({ data, currency }: MonthOverMonthProps) {
   // Add a human-friendly axis label without mutating the contract data.
   const chartData = data.map((d) => ({ ...d, label: formatMonthLabel(d.month) }));
 
@@ -47,9 +48,9 @@ export function MonthOverMonth({ data }: MonthOverMonthProps) {
               <YAxis
                 tick={{ fontSize: 12 }}
                 width={80}
-                tickFormatter={(v: number) => formatCurrency(v)}
+                tickFormatter={(v: number) => formatCurrency(v, currency)}
               />
-              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Tooltip formatter={(value: number) => formatCurrency(value, currency)} />
               <Bar dataKey="spend" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

@@ -10,11 +10,16 @@
 // ---------------------------------------------------------------------------
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { apiGet, apiPost, apiUpload } from "../lib/api";
+import { apiGet, apiPost, apiPut, apiUpload } from "../lib/api";
 import { SpendingByCategory } from "../components/SpendingByCategory";
 import { MonthOverMonth } from "../components/MonthOverMonth";
 import { ForecastCard } from "../components/ForecastCard";
 import { InsightsPanel } from "../components/InsightsPanel";
+import { ChatAssistant } from "../components/ChatAssistant";
+import { BudgetsPanel } from "../components/BudgetsPanel";
+import { GoalsPanel } from "../components/GoalsPanel";
+import { CurrencySelector } from "../components/CurrencySelector";
+import { formatCurrency, type Currency } from "../lib/format";
 
 // The shape of a transaction row coming back from GET /transactions.
 interface Transaction {
@@ -38,6 +43,9 @@ interface Insights {
   forecastNextMonth: number;
 }
 
+// The simple tabbed layout that holds the overview vs. the new feature panels.
+type Tab = "overview" | "chat" | "budgets" | "goals";
+
 export function Dashboard() {
   const { session, signOut } = useAuth();
   const [txns, setTxns] = useState<Transaction[]>([]);
@@ -46,6 +54,8 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
+  const [currency, setCurrency] = useState<Currency>("USD");
+  const [tab, setTab] = useState<Tab>("overview");
 
   // Fetch the user's transactions (the generic types the response for us).
   async function loadTransactions() {
@@ -77,12 +87,34 @@ export function Dashboard() {
     setUserId(me.user_id);
   }
 
-  // Load everything once on mount. Transactions first, then insights/me.
+  // Load the user's display-currency preference (the backend auto-creates the
+  // profile row with DEFAULT_CURRENCY when it's absent, so this always returns).
+  async function loadProfile() {
+    const p = await apiGet<{ currency: Currency }>("/profile");
+    setCurrency(p.currency);
+  }
+
+  // Persist a currency change immediately, then reflect it in the UI.
+  async function changeCurrency(next: Currency) {
+    setCurrency(next); // optimistic — money re-renders right away
+    try {
+      const p = await apiPut<{ currency: Currency }, { currency: Currency }>(
+        "/profile",
+        { currency: next },
+      );
+      setCurrency(p.currency);
+    } catch (err: unknown) {
+      setError(String(err));
+    }
+  }
+
+  // Load everything once on mount. Transactions first, then insights/me/profile.
   useEffect(() => {
     (async () => {
       await loadTransactions();
       await loadInsights();
       await loadMe();
+      await loadProfile();
     })().catch((e: unknown) => setError(String(e)));
   }, []);
 
@@ -127,7 +159,10 @@ export function Dashboard() {
     <div style={{ maxWidth: 760, margin: "40px auto", fontFamily: "system-ui" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Dashboard</h1>
-        <button onClick={signOut}>Sign out</button>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <CurrencySelector value={currency} onChange={changeCurrency} />
+          <button onClick={signOut}>Sign out</button>
+        </div>
       </header>
 
       <p>Logged in as: <strong>{session?.user.email}</strong></p>
@@ -137,66 +172,104 @@ export function Dashboard() {
         </p>
       )}
 
-      <section style={{ marginTop: 24, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
-        <h3 style={{ marginTop: 0 }}>Import transactions</h3>
-        <input type="file" accept=".csv" onChange={handleFile} disabled={importing} />
-        {importing && <span style={{ marginLeft: 8 }}>Importing…</span>}
-        <div style={{ marginTop: 12 }}>
-          <button onClick={handleCategorize} disabled={categorizing}>
-            {categorizing ? "Categorizing…" : "Categorize with AI"}
-          </button>
-        </div>
-      </section>
-
       {error && <p style={{ color: "crimson" }}>Error: {error}</p>}
 
-      {/* AI insight panels — only shown once the backend has data to analyze. */}
-      {insights && (
+      {/* Simple tab bar to keep overview, chat, budgets, and goals separated. */}
+      <nav style={{ display: "flex", gap: 8, marginTop: 24, borderBottom: "1px solid #eee" }}>
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            style={{
+              padding: "8px 14px",
+              border: "none",
+              borderBottom: tab === t.id ? "2px solid #6366f1" : "2px solid transparent",
+              background: "none",
+              cursor: "pointer",
+              fontWeight: tab === t.id ? 700 : 400,
+              color: tab === t.id ? "#111" : "#666",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {tab === "overview" && (
         <>
-          <ForecastCard value={insights.forecastNextMonth} />
-          <InsightsPanel
-            narrative={insights.narrative}
-            flags={insights.flags}
-            totalSpend={insights.totalSpend}
-            totalIncome={insights.totalIncome}
-          />
-          <SpendingByCategory data={insights.byCategory} />
-          <MonthOverMonth data={insights.monthOverMonth} />
+          <section style={{ marginTop: 24, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
+            <h3 style={{ marginTop: 0 }}>Import transactions</h3>
+            <input type="file" accept=".csv" onChange={handleFile} disabled={importing} />
+            {importing && <span style={{ marginLeft: 8 }}>Importing…</span>}
+            <div style={{ marginTop: 12 }}>
+              <button onClick={handleCategorize} disabled={categorizing}>
+                {categorizing ? "Categorizing…" : "Categorize with AI"}
+              </button>
+            </div>
+          </section>
+
+          {/* AI insight panels — only shown once the backend has data to analyze. */}
+          {insights && (
+            <>
+              <ForecastCard value={insights.forecastNextMonth} currency={currency} />
+              <InsightsPanel
+                narrative={insights.narrative}
+                flags={insights.flags}
+                totalSpend={insights.totalSpend}
+                totalIncome={insights.totalIncome}
+                currency={currency}
+              />
+              <SpendingByCategory data={insights.byCategory} currency={currency} />
+              <MonthOverMonth data={insights.monthOverMonth} currency={currency} />
+            </>
+          )}
+
+          <section style={{ marginTop: 24 }}>
+            <h3>Your transactions ({txns.length})</h3>
+            {txns.length === 0 ? (
+              <p style={{ color: "#666" }}>No transactions yet — import a CSV above.</p>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
+                    <th style={{ padding: 8 }}>Date</th>
+                    <th style={{ padding: 8 }}>Description</th>
+                    <th style={{ padding: 8, textAlign: "right" }}>Amount</th>
+                    <th style={{ padding: 8 }}>Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {txns.map((t) => {
+                    const amount = Number(t.amount);
+                    return (
+                      <tr key={t.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                        <td style={{ padding: 8 }}>{t.date}</td>
+                        <td style={{ padding: 8 }}>{t.description}</td>
+                        <td style={{ padding: 8, textAlign: "right", color: amount < 0 ? "crimson" : "green" }}>
+                          {formatCurrency(amount, currency)}
+                        </td>
+                        <td style={{ padding: 8, color: "#666" }}>{t.category ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </section>
         </>
       )}
 
-      <section style={{ marginTop: 24 }}>
-        <h3>Your transactions ({txns.length})</h3>
-        {txns.length === 0 ? (
-          <p style={{ color: "#666" }}>No transactions yet — import a CSV above.</p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
-                <th style={{ padding: 8 }}>Date</th>
-                <th style={{ padding: 8 }}>Description</th>
-                <th style={{ padding: 8, textAlign: "right" }}>Amount</th>
-                <th style={{ padding: 8 }}>Category</th>
-              </tr>
-            </thead>
-            <tbody>
-              {txns.map((t) => {
-                const amount = Number(t.amount);
-                return (
-                  <tr key={t.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                    <td style={{ padding: 8 }}>{t.date}</td>
-                    <td style={{ padding: 8 }}>{t.description}</td>
-                    <td style={{ padding: 8, textAlign: "right", color: amount < 0 ? "crimson" : "green" }}>
-                      {amount.toFixed(2)}
-                    </td>
-                    <td style={{ padding: 8, color: "#666" }}>{t.category ?? "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
+      {tab === "chat" && <ChatAssistant />}
+      {tab === "budgets" && <BudgetsPanel currency={currency} />}
+      {tab === "goals" && <GoalsPanel currency={currency} />}
     </div>
   );
 }
+
+// Tab definitions, kept module-level so the render loop stays declarative.
+const TABS: { id: Tab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "chat", label: "Chat" },
+  { id: "budgets", label: "Budgets" },
+  { id: "goals", label: "Goals" },
+];

@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, type Currency } from "../lib/format";
 
 // The exact row shape the /insights contract gives us under "byCategory".
 interface CategorySpend {
@@ -22,6 +22,7 @@ interface CategorySpend {
 
 interface SpendingByCategoryProps {
   data: CategorySpend[];
+  currency?: Currency;
 }
 
 const cardStyle: React.CSSProperties = {
@@ -31,7 +32,7 @@ const cardStyle: React.CSSProperties = {
   borderRadius: 8,
 };
 
-export function SpendingByCategory({ data }: SpendingByCategoryProps) {
+export function SpendingByCategory({ data, currency }: SpendingByCategoryProps) {
   const hasData = data.length > 0 && data.some((d) => d.amount > 0);
 
   return (
@@ -46,9 +47,9 @@ export function SpendingByCategory({ data }: SpendingByCategoryProps) {
               <YAxis
                 tick={{ fontSize: 12 }}
                 width={80}
-                tickFormatter={(v: number) => formatCurrency(v)}
+                tickFormatter={(v: number) => formatCurrency(v, currency)}
               />
-              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Tooltip formatter={(value: number) => formatCurrency(value, currency)} />
               <Bar dataKey="amount" fill="#6366f1" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
