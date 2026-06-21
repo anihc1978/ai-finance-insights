@@ -36,11 +36,36 @@ export function formatCurrency(n: number, currency: Currency = "USD"): string {
   return FORMATTERS[currency].format(n);
 }
 
-/** Turn a "YYYY-MM" period into a friendly label, e.g. "2026-06" -> "Jun 2026". */
+/**
+ * Spanish display label for a backend category key. The keys stay English in the
+ * DB and logic (categorizer, budgets, charts); this only changes what's shown.
+ */
+const CATEGORY_LABELS_ES: Record<string, string> = {
+  Groceries: "Alimentos",
+  Dining: "Restaurantes",
+  Transport: "Transporte",
+  Utilities: "Servicios",
+  Housing: "Vivienda",
+  Shopping: "Compras",
+  Entertainment: "Entretenimiento",
+  Health: "Salud",
+  Travel: "Viajes",
+  Subscriptions: "Suscripciones",
+  Income: "Ingresos",
+  Transfers: "Transferencias",
+  Other: "Otros",
+};
+
+export function categoryLabel(key: string | null | undefined): string {
+  if (!key) return "Sin categoría";
+  return CATEGORY_LABELS_ES[key] ?? key;
+}
+
+/** Turn a "YYYY-MM" period into a friendly label, e.g. "2026-06" -> "jun 2026". */
 export function formatMonthLabel(month: string): string {
   const [year, m] = month.split("-").map(Number);
   if (!year || !m) return month; // fall back to the raw string if it's malformed
-  return new Date(year, m - 1, 1).toLocaleDateString("en-US", {
+  return new Date(year, m - 1, 1).toLocaleDateString("es-PE", {
     month: "short",
     year: "numeric",
   });

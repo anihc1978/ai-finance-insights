@@ -85,7 +85,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
   async function handleAdd() {
     const target_amount = Number(target);
     if (!name.trim() || !Number.isFinite(target_amount) || target_amount <= 0) {
-      setError("Enter a name and a positive target amount.");
+      setError("Ingresa un nombre y un objetivo positivo.");
       return;
     }
     setBusy(true);
@@ -112,11 +112,11 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
 
   // Add a contribution to a goal's saved_amount (PATCH the running total).
   async function handleAddSavings(g: Goal) {
-    const input = window.prompt(`Add to "${g.name}" savings:`, "");
+    const input = window.prompt(`Agregar al ahorro de "${g.name}":`, "");
     if (input === null) return;
     const delta = Number(input);
     if (!Number.isFinite(delta) || delta <= 0) {
-      setError("Enter a positive amount to add.");
+      setError("Ingresa un monto positivo para agregar.");
       return;
     }
     setBusy(true);
@@ -148,20 +148,20 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
 
   return (
     <section style={cardStyle}>
-      <h3 style={{ marginTop: 0 }}>Savings goals</h3>
+      <h3 style={{ marginTop: 0 }}>Metas de ahorro</h3>
 
       {/* Add a goal */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Goal name"
+          placeholder="Nombre de la meta"
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
         />
         <input
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          placeholder="Target amount"
+          placeholder="Objetivo"
           type="number"
           min="0"
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6, width: 130 }}
@@ -173,7 +173,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
         />
         <button onClick={handleAdd} disabled={busy}>
-          {busy ? "Saving…" : "Add goal"}
+          {busy ? "Guardando…" : "Agregar meta"}
         </button>
       </div>
 
@@ -181,7 +181,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
 
       {goals.length === 0 ? (
         <p style={{ color: "#666", marginTop: 12 }}>
-          No goals yet — add one above.
+          Aún no hay metas — agrega una arriba.
         </p>
       ) : (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -217,7 +217,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
                 </div>
                 {g.target_date && (
                   <p style={{ margin: "4px 0 0", fontSize: 12, color: "#666" }}>
-                    Target date: {g.target_date}
+                    Fecha objetivo: {g.target_date}
                   </p>
                 )}
                 <div style={{ marginTop: 6, display: "flex", gap: 12 }}>
@@ -226,14 +226,14 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
                     disabled={busy}
                     style={{ fontSize: 12, padding: "2px 8px" }}
                   >
-                    Add savings
+                    Agregar ahorro
                   </button>
                   <button
                     onClick={() => handleDelete(g.id)}
                     disabled={busy}
                     style={{ fontSize: 12, padding: "2px 8px", color: "crimson" }}
                   >
-                    Delete
+                    Eliminar
                   </button>
                 </div>
               </div>

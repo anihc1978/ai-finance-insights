@@ -29,7 +29,7 @@ import { ConverterPanel } from "../components/ConverterPanel";
 import { ReceiptScanner } from "../components/ReceiptScanner";
 import { AfpPanel } from "../components/AfpPanel";
 import { tokens } from "../lib/theme";
-import { formatCurrency, type Currency } from "../lib/format";
+import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 
 // The currency a transaction is denominated in (mirrors the backend column).
 type TxnCurrency = "PEN" | "USD";
@@ -202,19 +202,19 @@ export function Dashboard() {
           alignItems: "center",
         }}
       >
-        <h1 style={{ margin: 0, fontWeight: 500 }}>Dashboard</h1>
+        <h1 style={{ margin: 0, fontWeight: 500 }}>Panel</h1>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <CurrencySelector value={currency} onChange={changeCurrency} />
-          <button onClick={signOut}>Sign out</button>
+          <button onClick={signOut}>Cerrar sesión</button>
         </div>
       </header>
 
       <p style={{ color: tokens.colors.textMuted }}>
-        Logged in as: <strong>{session?.user.email}</strong>
+        Sesión iniciada como: <strong>{session?.user.email}</strong>
       </p>
       {userId && (
         <p style={{ color: tokens.colors.textMuted, fontSize: 13 }}>
-          Verified user_id from FastAPI: <code>{userId}</code>
+          user_id verificado desde FastAPI: <code>{userId}</code>
         </p>
       )}
 
@@ -263,7 +263,7 @@ export function Dashboard() {
               borderRadius: tokens.radii.card,
             }}
           >
-            <h3 style={{ marginTop: 0, fontWeight: 500 }}>Import transactions</h3>
+            <h3 style={{ marginTop: 0, fontWeight: 500 }}>Importar movimientos</h3>
             <div
               style={{
                 display: "flex",
@@ -293,7 +293,7 @@ export function Dashboard() {
                   onChange={(e) =>
                     setImportCurrency(e.target.value as TxnCurrency)
                   }
-                  aria-label="Import currency"
+                  aria-label="Moneda de importación"
                   style={{
                     padding: "6px 8px",
                     fontSize: 14,
@@ -310,7 +310,7 @@ export function Dashboard() {
             </div>
             <div style={{ marginTop: 12 }}>
               <button onClick={handleCategorize} disabled={categorizing}>
-                {categorizing ? "Categorizing…" : "Categorize with AI"}
+                {categorizing ? "Categorizando…" : "Categorizar con IA"}
               </button>
             </div>
 
@@ -342,15 +342,15 @@ export function Dashboard() {
                 }}
               >
                 <KpiCard
-                  label="Spent"
+                  label="Gastado"
                   value={formatCurrency(insights.totalSpend, currency)}
                 />
                 <KpiCard
-                  label="Income"
+                  label="Ingresos"
                   value={formatCurrency(insights.totalIncome, currency)}
                 />
                 <KpiCard
-                  label="Saved"
+                  label="Ahorrado"
                   value={formatCurrency(
                     insights.totalIncome - insights.totalSpend,
                     currency,
@@ -364,12 +364,12 @@ export function Dashboard() {
                           : "flat",
                     text:
                       insights.totalIncome - insights.totalSpend >= 0
-                        ? "Net positive"
-                        : "Net negative",
+                        ? "Saldo positivo"
+                        : "Saldo negativo",
                   }}
                 />
                 <KpiCard
-                  label="Forecast next month"
+                  label="Pronóstico próximo mes"
                   value={formatCurrency(insights.forecastNextMonth, currency)}
                 />
               </div>
@@ -400,11 +400,11 @@ export function Dashboard() {
 
           <section style={{ marginTop: 24 }}>
             <h3 style={{ fontWeight: 500 }}>
-              Your transactions ({txns.length})
+              Tus movimientos ({txns.length})
             </h3>
             {txns.length === 0 ? (
               <p style={{ color: tokens.colors.textMuted }}>
-                No transactions yet — import a CSV above.
+                Aún no hay movimientos — importa un CSV arriba.
               </p>
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -415,10 +415,10 @@ export function Dashboard() {
                       borderBottom: `1px solid ${tokens.colors.border}`,
                     }}
                   >
-                    <th style={{ padding: 8 }}>Date</th>
-                    <th style={{ padding: 8 }}>Description</th>
-                    <th style={{ padding: 8, textAlign: "right" }}>Amount</th>
-                    <th style={{ padding: 8 }}>Category</th>
+                    <th style={{ padding: 8 }}>Fecha</th>
+                    <th style={{ padding: 8 }}>Descripción</th>
+                    <th style={{ padding: 8, textAlign: "right" }}>Monto</th>
+                    <th style={{ padding: 8 }}>Categoría</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -446,7 +446,7 @@ export function Dashboard() {
                           {formatCurrency(amount, t.currency)}
                         </td>
                         <td style={{ padding: 8, color: tokens.colors.textMuted }}>
-                          {t.category ?? "—"}
+                          {categoryLabel(t.category)}
                         </td>
                       </tr>
                     );
@@ -491,10 +491,10 @@ function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
 
 // Tab definitions, kept module-level so the render loop stays declarative.
 const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
+  { id: "overview", label: "Resumen" },
   { id: "cambio", label: "Cambio" },
   { id: "afp", label: "AFP" },
   { id: "chat", label: "Chat" },
-  { id: "budgets", label: "Budgets" },
-  { id: "goals", label: "Goals" },
+  { id: "budgets", label: "Presupuestos" },
+  { id: "goals", label: "Metas" },
 ];

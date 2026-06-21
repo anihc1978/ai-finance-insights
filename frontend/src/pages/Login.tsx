@@ -35,7 +35,7 @@ export function Login() {
     <div style={{ maxWidth: 360, margin: "80px auto", fontFamily: "system-ui" }}>
       <h1>AI Finance Insights</h1>
       <p style={{ color: "#666" }}>
-        {mode === "login" ? "Sign in to continue" : "Create an account"}
+        {mode === "login" ? "Inicia sesión para continuar" : "Crea una cuenta"}
       </p>
 
       <form onSubmit={handleSubmit}>
@@ -49,14 +49,14 @@ export function Login() {
         />
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Contraseña"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           style={inputStyle}
         />
         <button type="submit" disabled={busy} style={buttonStyle}>
-          {busy ? "…" : mode === "login" ? "Sign in" : "Sign up"}
+          {busy ? "…" : mode === "login" ? "Iniciar sesión" : "Registrarse"}
         </button>
       </form>
 
@@ -66,7 +66,7 @@ export function Login() {
         onClick={() => setMode(mode === "login" ? "signup" : "login")}
         style={{ background: "none", border: "none", color: "#2e5c8a", cursor: "pointer" }}
       >
-        {mode === "login" ? "Need an account? Sign up" : "Have an account? Sign in"}
+        {mode === "login" ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
       </button>
     </div>
   );

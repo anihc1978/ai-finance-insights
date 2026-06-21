@@ -56,7 +56,7 @@ export function WalletSplit({ pen, usd }: WalletSplitProps) {
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 500, color: tokens.colors.text }}>
-        Your wallets
+        Tus billeteras
       </h3>
       <div style={{ display: "flex", gap: tokens.spacing.md }}>
         <Wallet label="Soles" amount={pen} walletCurrency="PEN" />

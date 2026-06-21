@@ -21,7 +21,7 @@ export function InsightCard({ narrative, flags }: InsightCardProps) {
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 500, color: tokens.colors.text }}>
-        AI insights
+        Análisis con IA
       </h3>
 
       {narrative ? (
@@ -29,7 +29,7 @@ export function InsightCard({ narrative, flags }: InsightCardProps) {
           {narrative}
         </p>
       ) : (
-        <p style={{ color: tokens.colors.textMuted }}>No narrative yet.</p>
+        <p style={{ color: tokens.colors.textMuted }}>Aún no hay análisis.</p>
       )}
 
       {flags.length > 0 && (
@@ -43,7 +43,7 @@ export function InsightCard({ narrative, flags }: InsightCardProps) {
               color: tokens.colors.textMuted,
             }}
           >
-            Flags
+            Alertas
           </h4>
           <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
             {flags.map((flag, i) => (

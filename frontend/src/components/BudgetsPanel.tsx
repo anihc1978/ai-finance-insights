@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../lib/api";
 import { supabase } from "../lib/supabase";
-import { formatCurrency, type Currency } from "../lib/format";
+import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 
 interface BudgetsPanelProps {
   currency: Currency;
@@ -93,7 +93,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
   async function handleSave() {
     const monthly_limit = Number(limit);
     if (!category.trim() || !Number.isFinite(monthly_limit) || monthly_limit <= 0) {
-      setError("Enter a category and a positive limit.");
+      setError("Ingresa una categoría y un límite positivo.");
       return;
     }
     setBusy(true);
@@ -147,7 +147,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
         setCategory(first.category);
         setLimit(String(first.suggested_limit));
       } else {
-        setError("No suggestions yet — import some transactions first.");
+        setError("Aún no hay sugerencias — importa algunos movimientos primero.");
       }
     } catch (e: unknown) {
       setError(String(e));
@@ -158,29 +158,29 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
 
   return (
     <section style={cardStyle}>
-      <h3 style={{ marginTop: 0 }}>Budgets</h3>
+      <h3 style={{ marginTop: 0 }}>Presupuestos</h3>
 
       {/* Add / edit a limit */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="Category"
+          placeholder="Categoría"
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
         />
         <input
           value={limit}
           onChange={(e) => setLimit(e.target.value)}
-          placeholder="Monthly limit"
+          placeholder="Límite mensual"
           type="number"
           min="0"
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6, width: 130 }}
         />
         <button onClick={handleSave} disabled={busy}>
-          {busy ? "Saving…" : "Set limit"}
+          {busy ? "Guardando…" : "Fijar límite"}
         </button>
         <button onClick={handleSuggest} disabled={suggesting}>
-          {suggesting ? "Thinking…" : "Suggest with AI"}
+          {suggesting ? "Pensando…" : "Sugerir con IA"}
         </button>
       </div>
 
@@ -188,7 +188,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
 
       {budgets.length === 0 ? (
         <p style={{ color: "#666", marginTop: 12 }}>
-          No budgets yet — set a category limit above.
+          Aún no hay presupuestos — fija un límite por categoría arriba.
         </p>
       ) : (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -200,7 +200,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
             return (
               <div key={b.category}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <strong>{b.category}</strong>
+                  <strong>{categoryLabel(b.category)}</strong>
                   <span style={{ color: over ? "crimson" : "#333" }}>
                     {formatCurrency(b.spent, currency)} / {formatCurrency(b.monthly_limit, currency)}
                   </span>
@@ -227,14 +227,14 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
                     onClick={() => startEdit(b)}
                     style={{ fontSize: 12, padding: "2px 8px" }}
                   >
-                    Edit
+                    Editar
                   </button>
                   <button
                     onClick={() => handleDelete(b.category)}
                     disabled={busy}
                     style={{ fontSize: 12, padding: "2px 8px", color: "crimson" }}
                   >
-                    Delete
+                    Eliminar
                   </button>
                 </div>
               </div>

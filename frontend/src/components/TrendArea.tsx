@@ -39,7 +39,7 @@ export function TrendArea({ data, currency }: TrendAreaProps) {
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 500, color: tokens.colors.text }}>
-        Spending over time
+        Gasto en el tiempo
       </h3>
       {chartData.length > 0 ? (
         <div style={{ width: "100%", height: 280 }}>
@@ -70,7 +70,7 @@ export function TrendArea({ data, currency }: TrendAreaProps) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <p style={{ color: tokens.colors.textMuted }}>Not enough history yet.</p>
+        <p style={{ color: tokens.colors.textMuted }}>Aún no hay suficiente historial.</p>
       )}
     </section>
   );

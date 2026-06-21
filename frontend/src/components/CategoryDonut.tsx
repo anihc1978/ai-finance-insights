@@ -4,7 +4,7 @@
 // Presentational: typed data in, chart out. No fetching.
 // ---------------------------------------------------------------------------
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { formatCurrency, type Currency } from "../lib/format";
+import { categoryLabel, formatCurrency, type Currency } from "../lib/format";
 import { tokens } from "../lib/theme";
 
 interface CategorySpend {
@@ -29,12 +29,16 @@ function colorFor(category: string): string {
 }
 
 export function CategoryDonut({ data, currency }: CategoryDonutProps) {
-  const slices = data.filter((d) => d.amount > 0);
+  // Keep the raw `category` key (drives colours); add a Spanish `label` for the
+  // legend/tooltip without touching the contract data.
+  const slices = data
+    .filter((d) => d.amount > 0)
+    .map((d) => ({ ...d, label: categoryLabel(d.category) }));
 
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 500, color: tokens.colors.text }}>
-        Spending by category
+        Gasto por categoría
       </h3>
       {slices.length > 0 ? (
         <div style={{ width: "100%", height: 280 }}>
@@ -43,7 +47,7 @@ export function CategoryDonut({ data, currency }: CategoryDonutProps) {
               <Pie
                 data={slices}
                 dataKey="amount"
-                nameKey="category"
+                nameKey="label"
                 innerRadius={64}
                 outerRadius={100}
                 paddingAngle={2}
@@ -62,7 +66,7 @@ export function CategoryDonut({ data, currency }: CategoryDonutProps) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <p style={{ color: tokens.colors.textMuted }}>No spending to chart for this month.</p>
+        <p style={{ color: tokens.colors.textMuted }}>No hay gastos para mostrar este mes.</p>
       )}
     </section>
   );

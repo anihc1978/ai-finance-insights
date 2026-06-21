@@ -22,7 +22,7 @@ export function CurrencySelector({ value, onChange }: CurrencySelectorProps) {
     <select
       value={value}
       onChange={handleChange}
-      aria-label="Display currency"
+      aria-label="Moneda"
       style={{
         padding: "6px 8px",
         fontSize: 14,

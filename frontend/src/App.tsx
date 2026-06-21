@@ -15,7 +15,7 @@ export function App() {
   const { session, loading } = useAuth();
 
   if (loading) {
-    return <p style={{ textAlign: "center", marginTop: 80 }}>Loading…</p>;
+    return <p style={{ textAlign: "center", marginTop: 80 }}>Cargando…</p>;
   }
 
   return session ? <Dashboard /> : <Login />;

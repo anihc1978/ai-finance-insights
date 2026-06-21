@@ -74,7 +74,7 @@ export function ChatAssistant() {
         { role: "assistant", content: data.reply },
       ]);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : "Algo salió mal.");
     } finally {
       setLoading(false);
     }
@@ -82,13 +82,13 @@ export function ChatAssistant() {
 
   return (
     <section style={cardStyle}>
-      <h3 style={{ marginTop: 0 }}>Ask your money assistant</h3>
+      <h3 style={{ marginTop: 0 }}>Pregúntale a tu dinero</h3>
 
       <div style={transcriptStyle}>
         {messages.length === 0 && !loading ? (
           <p style={{ color: "#666", margin: 0 }}>
-            Ask about your spending, e.g. “How much did I spend on groceries last
-            month?”
+            Pregunta sobre tus gastos, por ejemplo: “¿Cuánto gasté en alimentos el
+            mes pasado?”
           </p>
         ) : (
           messages.map((m, i) => {
@@ -125,7 +125,7 @@ export function ChatAssistant() {
               fontStyle: "italic",
             }}
           >
-            Thinking…
+            Pensando…
           </div>
         )}
       </div>
@@ -141,7 +141,7 @@ export function ChatAssistant() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a question…"
+          placeholder="Pregúntale a tu dinero…"
           disabled={loading}
           style={{
             flex: 1,
@@ -164,7 +164,7 @@ export function ChatAssistant() {
             cursor: loading || input.trim().length === 0 ? "default" : "pointer",
           }}
         >
-          Send
+          Enviar
         </button>
       </form>
     </section>
