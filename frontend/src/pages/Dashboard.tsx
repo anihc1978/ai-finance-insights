@@ -4,6 +4,11 @@
 // Milestones 4–6: AI categorization + AI insights (category chart, month-over-
 // month chart, narrative/flags panel, and a next-month forecast card).
 //
+// Peru FX suite: the Overview tab is rebuilt to a premium, card-based design
+// (KpiCard / CategoryDonut / TrendArea / InsightCard / WalletSplit), a "Cambio"
+// tab renders the dual-currency converter (ConverterPanel), and CSV import is
+// dual-currency aware (rows are tagged PEN or USD).
+//
 // Every API call goes through the typed apiGet/apiPost/apiUpload helpers
 // (JWT attached automatically), so this page also proves the JWT -> FastAPI
 // round-trip by showing the user_id GET /me returns.
@@ -11,23 +16,31 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { apiGet, apiPost, apiPut, apiUpload } from "../lib/api";
-import { SpendingByCategory } from "../components/SpendingByCategory";
-import { MonthOverMonth } from "../components/MonthOverMonth";
-import { ForecastCard } from "../components/ForecastCard";
-import { InsightsPanel } from "../components/InsightsPanel";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { BudgetsPanel } from "../components/BudgetsPanel";
 import { GoalsPanel } from "../components/GoalsPanel";
 import { CurrencySelector } from "../components/CurrencySelector";
+import { KpiCard } from "../components/KpiCard";
+import { CategoryDonut } from "../components/CategoryDonut";
+import { TrendArea } from "../components/TrendArea";
+import { InsightCard } from "../components/InsightCard";
+import { WalletSplit } from "../components/WalletSplit";
+import { ConverterPanel } from "../components/ConverterPanel";
+import { tokens } from "../lib/theme";
 import { formatCurrency, type Currency } from "../lib/format";
 
+// The currency a transaction is denominated in (mirrors the backend column).
+type TxnCurrency = "PEN" | "USD";
+
 // The shape of a transaction row coming back from GET /transactions.
+// `currency` is the dual-currency tag added by the Peru FX suite.
 interface Transaction {
   id: string;
   date: string;
   description: string;
   amount: number;
   category: string | null;
+  currency: TxnCurrency;
 }
 
 // The shape of GET /insights (see the shared contract). Keeping it co-located
@@ -44,7 +57,7 @@ interface Insights {
 }
 
 // The simple tabbed layout that holds the overview vs. the new feature panels.
-type Tab = "overview" | "chat" | "budgets" | "goals";
+type Tab = "overview" | "cambio" | "chat" | "budgets" | "goals";
 
 export function Dashboard() {
   const { session, signOut } = useAuth();
@@ -55,6 +68,9 @@ export function Dashboard() {
   const [importing, setImporting] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
   const [currency, setCurrency] = useState<Currency>("USD");
+  // Which currency the next CSV import is denominated in (PEN by default,
+  // matching the backend column default). Separate from the display currency.
+  const [importCurrency, setImportCurrency] = useState<TxnCurrency>("PEN");
   const [tab, setTab] = useState<Tab>("overview");
 
   // Fetch the user's transactions (the generic types the response for us).
@@ -118,14 +134,17 @@ export function Dashboard() {
     })().catch((e: unknown) => setError(String(e)));
   }, []);
 
-  // When the user picks a CSV: upload it, then refresh table + insights.
+  // When the user picks a CSV: upload it (tagged with the chosen import
+  // currency), then refresh table + insights.
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
     setError(null);
     try {
-      await apiUpload<{ imported: number }>("/transactions/import", file);
+      await apiUpload<{ imported: number }>("/transactions/import", file, {
+        currency: importCurrency,
+      });
       await loadTransactions(); // refresh so the new rows appear
       await loadInsights(); // new data -> recompute insights
     } catch (err: unknown) {
@@ -155,27 +174,59 @@ export function Dashboard() {
     }
   }
 
+  // Wallet totals: sum the raw transaction amounts per denomination so the
+  // two-wallets card can show the S/ total and US$ total side by side.
+  const penTotal = txns
+    .filter((t) => t.currency === "PEN")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const usdTotal = txns
+    .filter((t) => t.currency === "USD")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
   return (
-    <div style={{ maxWidth: 760, margin: "40px auto", fontFamily: "system-ui" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Dashboard</h1>
+    <div
+      style={{
+        maxWidth: 860,
+        margin: "40px auto",
+        fontFamily: "system-ui",
+        color: tokens.colors.text,
+        padding: `0 ${tokens.spacing.lg}px`,
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <h1 style={{ margin: 0, fontWeight: 500 }}>Dashboard</h1>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <CurrencySelector value={currency} onChange={changeCurrency} />
           <button onClick={signOut}>Sign out</button>
         </div>
       </header>
 
-      <p>Logged in as: <strong>{session?.user.email}</strong></p>
+      <p style={{ color: tokens.colors.textMuted }}>
+        Logged in as: <strong>{session?.user.email}</strong>
+      </p>
       {userId && (
-        <p style={{ color: "#666", fontSize: 13 }}>
+        <p style={{ color: tokens.colors.textMuted, fontSize: 13 }}>
           Verified user_id from FastAPI: <code>{userId}</code>
         </p>
       )}
 
       {error && <p style={{ color: "crimson" }}>Error: {error}</p>}
 
-      {/* Simple tab bar to keep overview, chat, budgets, and goals separated. */}
-      <nav style={{ display: "flex", gap: 8, marginTop: 24, borderBottom: "1px solid #eee" }}>
+      {/* Tab bar: overview, the new Cambio converter, chat, budgets, goals. */}
+      <nav
+        style={{
+          display: "flex",
+          gap: 8,
+          marginTop: 24,
+          borderBottom: `1px solid ${tokens.colors.border}`,
+        }}
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -183,11 +234,14 @@ export function Dashboard() {
             style={{
               padding: "8px 14px",
               border: "none",
-              borderBottom: tab === t.id ? "2px solid #6366f1" : "2px solid transparent",
+              borderBottom:
+                tab === t.id
+                  ? `2px solid ${tokens.colors.accent}`
+                  : "2px solid transparent",
               background: "none",
               cursor: "pointer",
-              fontWeight: tab === t.id ? 700 : 400,
-              color: tab === t.id ? "#111" : "#666",
+              fontWeight: tab === t.id ? 500 : 400,
+              color: tab === t.id ? tokens.colors.text : tokens.colors.textMuted,
             }}
           >
             {t.label}
@@ -197,10 +251,61 @@ export function Dashboard() {
 
       {tab === "overview" && (
         <>
-          <section style={{ marginTop: 24, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
-            <h3 style={{ marginTop: 0 }}>Import transactions</h3>
-            <input type="file" accept=".csv" onChange={handleFile} disabled={importing} />
-            {importing && <span style={{ marginLeft: 8 }}>Importing…</span>}
+          {/* Import — dual-currency aware: the picker tags the next upload. */}
+          <section
+            style={{
+              marginTop: 24,
+              padding: tokens.spacing.lg,
+              background: tokens.colors.surface,
+              border: `1px solid ${tokens.colors.border}`,
+              borderRadius: tokens.radii.card,
+            }}
+          >
+            <h3 style={{ marginTop: 0, fontWeight: 500 }}>Import transactions</h3>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFile}
+                disabled={importing}
+              />
+              <label
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 13,
+                  color: tokens.colors.textMuted,
+                }}
+              >
+                Moneda
+                <select
+                  value={importCurrency}
+                  onChange={(e) =>
+                    setImportCurrency(e.target.value as TxnCurrency)
+                  }
+                  aria-label="Import currency"
+                  style={{
+                    padding: "6px 8px",
+                    fontSize: 14,
+                    borderRadius: 6,
+                    border: `1px solid ${tokens.colors.border}`,
+                    background: "white",
+                  }}
+                >
+                  <option value="PEN">PEN (S/)</option>
+                  <option value="USD">USD (US$)</option>
+                </select>
+              </label>
+              {importing && <span>Importando…</span>}
+            </div>
             <div style={{ marginTop: 12 }}>
               <button onClick={handleCategorize} disabled={categorizing}>
                 {categorizing ? "Categorizing…" : "Categorize with AI"}
@@ -208,30 +313,95 @@ export function Dashboard() {
             </div>
           </section>
 
+          {/* Two wallets: S/ total and US$ total side by side. */}
+          <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
+
           {/* AI insight panels — only shown once the backend has data to analyze. */}
           {insights && (
             <>
-              <ForecastCard value={insights.forecastNextMonth} currency={currency} />
-              <InsightsPanel
+              {/* KPI metric cards: Spent / Income / Saved / Forecast. */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                  gap: tokens.spacing.md,
+                  marginTop: tokens.spacing.lg,
+                }}
+              >
+                <KpiCard
+                  label="Spent"
+                  value={formatCurrency(insights.totalSpend, currency)}
+                />
+                <KpiCard
+                  label="Income"
+                  value={formatCurrency(insights.totalIncome, currency)}
+                />
+                <KpiCard
+                  label="Saved"
+                  value={formatCurrency(
+                    insights.totalIncome - insights.totalSpend,
+                    currency,
+                  )}
+                  trend={{
+                    dir:
+                      insights.totalIncome - insights.totalSpend > 0
+                        ? "up"
+                        : insights.totalIncome - insights.totalSpend < 0
+                          ? "down"
+                          : "flat",
+                    text:
+                      insights.totalIncome - insights.totalSpend >= 0
+                        ? "Net positive"
+                        : "Net negative",
+                  }}
+                />
+                <KpiCard
+                  label="Forecast next month"
+                  value={formatCurrency(insights.forecastNextMonth, currency)}
+                />
+              </div>
+
+              {/* Spending mix + month-over-month trend. */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                  gap: tokens.spacing.md,
+                  marginTop: tokens.spacing.lg,
+                }}
+              >
+                <CategoryDonut data={insights.byCategory} currency={currency} />
+                <TrendArea
+                  data={insights.monthOverMonth}
+                  currency={currency}
+                />
+              </div>
+
+              {/* Claude's narrative + flags. */}
+              <InsightCard
                 narrative={insights.narrative}
                 flags={insights.flags}
-                totalSpend={insights.totalSpend}
-                totalIncome={insights.totalIncome}
-                currency={currency}
               />
-              <SpendingByCategory data={insights.byCategory} currency={currency} />
-              <MonthOverMonth data={insights.monthOverMonth} currency={currency} />
             </>
           )}
 
           <section style={{ marginTop: 24 }}>
-            <h3>Your transactions ({txns.length})</h3>
+            <h3 style={{ fontWeight: 500 }}>
+              Your transactions ({txns.length})
+            </h3>
             {txns.length === 0 ? (
-              <p style={{ color: "#666" }}>No transactions yet — import a CSV above.</p>
+              <p style={{ color: tokens.colors.textMuted }}>
+                No transactions yet — import a CSV above.
+              </p>
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
+                  <tr
+                    style={{
+                      textAlign: "left",
+                      borderBottom: `1px solid ${tokens.colors.border}`,
+                    }}
+                  >
                     <th style={{ padding: 8 }}>Date</th>
                     <th style={{ padding: 8 }}>Description</th>
                     <th style={{ padding: 8, textAlign: "right" }}>Amount</th>
@@ -242,13 +412,29 @@ export function Dashboard() {
                   {txns.map((t) => {
                     const amount = Number(t.amount);
                     return (
-                      <tr key={t.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                      <tr
+                        key={t.id}
+                        style={{
+                          borderBottom: `1px solid ${tokens.colors.border}`,
+                        }}
+                      >
                         <td style={{ padding: 8 }}>{t.date}</td>
-                        <td style={{ padding: 8 }}>{t.description}</td>
-                        <td style={{ padding: 8, textAlign: "right", color: amount < 0 ? "crimson" : "green" }}>
-                          {formatCurrency(amount, currency)}
+                        <td style={{ padding: 8 }}>
+                          {t.description}
+                          <CurrencyBadge currency={t.currency} />
                         </td>
-                        <td style={{ padding: 8, color: "#666" }}>{t.category ?? "—"}</td>
+                        <td
+                          style={{
+                            padding: 8,
+                            textAlign: "right",
+                            color: amount < 0 ? "crimson" : "green",
+                          }}
+                        >
+                          {formatCurrency(amount, t.currency)}
+                        </td>
+                        <td style={{ padding: 8, color: tokens.colors.textMuted }}>
+                          {t.category ?? "—"}
+                        </td>
                       </tr>
                     );
                   })}
@@ -259,6 +445,7 @@ export function Dashboard() {
         </>
       )}
 
+      {tab === "cambio" && <ConverterPanel />}
       {tab === "chat" && <ChatAssistant />}
       {tab === "budgets" && <BudgetsPanel currency={currency} />}
       {tab === "goals" && <GoalsPanel currency={currency} />}
@@ -266,9 +453,32 @@ export function Dashboard() {
   );
 }
 
+// A small pill that marks which currency a row is denominated in. Inline so the
+// transactions table stays self-contained.
+function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
+  const isPen = currency === "PEN";
+  return (
+    <span
+      style={{
+        marginLeft: 8,
+        padding: "1px 6px",
+        fontSize: 11,
+        fontWeight: 500,
+        borderRadius: tokens.radii.chip,
+        color: isPen ? tokens.colors.accent : tokens.colors.text,
+        background: isPen ? "#1D9E7515" : tokens.colors.surface,
+        border: `1px solid ${tokens.colors.border}`,
+      }}
+    >
+      {isPen ? "S/" : "US$"}
+    </span>
+  );
+}
+
 // Tab definitions, kept module-level so the render loop stays declarative.
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "cambio", label: "Cambio" },
   { id: "chat", label: "Chat" },
   { id: "budgets", label: "Budgets" },
   { id: "goals", label: "Goals" },

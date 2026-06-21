@@ -122,10 +122,21 @@ export async function apiDelete<TResponse>(path: string): Promise<TResponse> {
  * browser sets it automatically *with the multipart boundary*. Setting it by
  * hand would break the upload.
  */
-export async function apiUpload<T>(path: string, file: File): Promise<T> {
+export async function apiUpload<T>(
+  path: string,
+  file: File,
+  fields?: Record<string, string>,
+): Promise<T> {
   const token = await getToken();
   const form = new FormData();
   form.append("file", file);
+  // Optional extra form fields (e.g. the import currency PEN|USD). Sent as
+  // multipart parts alongside the file so the backend reads them via Form(...).
+  if (fields) {
+    for (const [key, value] of Object.entries(fields)) {
+      form.append(key, value);
+    }
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},

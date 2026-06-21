@@ -9,7 +9,7 @@ from datetime import datetime
 
 import pandas as pd
 from anthropic import AsyncAnthropic
-from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, status
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, status
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -29,6 +29,7 @@ from app.services.budgets import (
 )
 from app.services.categorizer import categorize
 from app.services.chat import build_chat_reply
+from app.services.fx import get_official_history, get_rates
 from app.services.insights import build_insight
 
 app = FastAPI(title="AI Finance Insights API")
@@ -61,9 +62,17 @@ def me(user: CurrentUser = Depends(get_current_user)):
 @app.post("/transactions/import")
 async def import_transactions(
     file: UploadFile = File(...),
+    currency: str = Form("PEN"),
     user: CurrentUser = Depends(get_current_user),
 ):
-    """Receive a CSV, parse it, and store each row as one of the user's transactions."""
+    """Receive a CSV, parse it, and store each row as one of the user's transactions.
+
+    Every row in one import shares a single `currency` tag (PEN or USD). Anything
+    other than USD falls back to the PEN default, so a bad/missing value can never
+    write an invalid currency.
+    """
+    currency = currency if currency in ("PEN", "USD") else "PEN"
+
     contents = await file.read()                       # raw bytes of the uploaded CSV
     df = pd.read_csv(io.BytesIO(contents), dtype=str)  # parse; dtype=str keeps values JSON-safe
 
@@ -73,6 +82,7 @@ async def import_transactions(
             "date": str(r["date"]),
             "description": str(r["description"]),
             "amount": float(r["amount"]),
+            "currency": currency,
             "raw": r.to_dict(),
         }
         for _, r in df.iterrows()
@@ -88,7 +98,7 @@ def list_transactions(user: CurrentUser = Depends(get_current_user)):
     res = (
         user_client(user.token)
         .table("transactions")
-        .select("id, date, description, amount, category")
+        .select("id, date, description, amount, category, currency")
         .order("date", desc=True)
         .execute()
     )
@@ -173,6 +183,28 @@ async def get_insights(
         pass
 
     return insight
+
+
+# ---------------------------------------------------------------------------
+# Peru FX: USD/PEN exchange rates. Official from the BCRP free API; paralelo +
+# bank scraped from cuantoestaeldolar.pe. The fx service caches and tolerates
+# upstream failures (never 500s), so these routes just proxy it behind auth.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/rates")
+async def rates(user: CurrentUser = Depends(get_current_user)):
+    """Current oficial / paralelo / banco USD-PEN rates (cached, stale-tolerant)."""
+    return await get_rates()
+
+
+@app.get("/rates/history")
+async def rates_history(
+    days: int = 30,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Official USD-PEN series over the last `days` business days (for the chart)."""
+    return await get_official_history(days)
 
 
 # ---------------------------------------------------------------------------

@@ -110,3 +110,8 @@ create policy "own budgets - all" on public.budgets for all
 drop policy if exists "own goals - all" on public.goals;
 create policy "own goals - all" on public.goals for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ---- dual-currency: tag each transaction PEN or USD (Peru runs both) ---------
+alter table public.transactions
+  add column if not exists currency text not null default 'PEN'
+  check (currency in ('PEN','USD'));
