@@ -104,7 +104,9 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
   // srgb against the surface (not a low alpha over white) keeps the strong end
   // bold instead of washed out.
   function cellBg(spend: number): string {
-    if (spend <= 0) return tokens.colors.surface;
+    // No-spend days sit on the white card background (cardBg = #FFFFFF in light,
+    // dark card colour in dark) so spent days pop against a clean white grid.
+    if (spend <= 0) return tokens.colors.cardBg;
     const ratio = maxDay > 0 ? spend / maxDay : 0;
     // 40%..100% accent — a strong floor so busy days clearly stand out.
     const pct = Math.round(40 + ratio * 60);

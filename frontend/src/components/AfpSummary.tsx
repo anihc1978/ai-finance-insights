@@ -61,6 +61,11 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
   }
 
   const hasData = latest != null;
+  // When there are no real records, show the same "AFP Integra" example total
+  // the full panel falls back to, tagged "ejemplo", instead of a bare empty
+  // state — so the dashboard card isn't empty before the first real entry.
+  const EXAMPLE_TOTAL = 15640;
+  const showExample = loaded && !hasData;
 
   return (
     <>
@@ -91,7 +96,12 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
           }}
         >
           <span style={{ fontSize: 13, color: tokens.colors.textMuted }}>
-            AFP{hasData && latest.afp_name ? ` · ${latest.afp_name}` : ""}
+            AFP
+            {hasData && latest.afp_name
+              ? ` · ${latest.afp_name}`
+              : showExample
+              ? " · Integra"
+              : ""}
           </span>
           <span style={{ fontSize: 13, color: tokens.colors.accent }}>Ver →</span>
         </div>
@@ -112,9 +122,41 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
               Saldo al {latest.as_of}
             </div>
           </>
+        ) : showExample ? (
+          <>
+            <div
+              style={{
+                marginTop: 4,
+                display: "flex",
+                alignItems: "baseline",
+                gap: tokens.spacing.sm,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ fontSize: 22, fontWeight: 600, color: tokens.colors.text }}>
+                {formatCurrency(EXAMPLE_TOTAL, currency)}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: tokens.colors.accent,
+                  background: tokens.colors.surface,
+                  border: `1px solid ${tokens.colors.border}`,
+                  borderRadius: tokens.radii.chip,
+                  padding: "2px 8px",
+                }}
+              >
+                ejemplo
+              </span>
+            </div>
+            <div style={{ marginTop: 2, fontSize: 12, color: tokens.colors.textMuted }}>
+              Agrega tu AFP — escanea tu estado de cuenta.
+            </div>
+          </>
         ) : (
           <div style={{ marginTop: 4, fontSize: 13, color: tokens.colors.textMuted }}>
-            {loaded ? "Agrega tu AFP — escanea tu estado de cuenta." : "Cargando…"}
+            Cargando…
           </div>
         )}
       </button>
