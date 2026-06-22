@@ -315,12 +315,12 @@ export function Dashboard() {
               }}
             >
               <KpiCard
-                label="Gastado"
-                value={formatCurrency(insights.totalSpend, currency)}
-              />
-              <KpiCard
                 label="Ingresos"
                 value={formatCurrency(insights.totalIncome, currency)}
+              />
+              <KpiCard
+                label="Gastado"
+                value={formatCurrency(insights.totalSpend, currency)}
               />
               <KpiCard
                 label="Ahorrado"
@@ -352,13 +352,15 @@ export function Dashboard() {
             <WeeklyRecap />
           </section>
 
+          {/* Tus billeteras — directly after Esta semana, same section treatment. */}
+          <section style={{ marginTop: 16 }}>
+            <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
+          </section>
+
           {/* Próximos pagos: alertas de pagos y recordatorios próximos. */}
           <section style={{ marginTop: tokens.spacing.lg }}>
             <UpcomingPayments />
           </section>
-
-          {/* Two wallets: S/ total and US$ total side by side. */}
-          <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
 
           {/* Ingresos por fuente: a mini-breakdown of where income comes from. */}
           {incomeBySource.length > 0 && (
