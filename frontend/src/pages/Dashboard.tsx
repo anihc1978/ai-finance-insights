@@ -4,10 +4,11 @@
 // Milestones 4–6: AI categorization + AI insights (category chart, month-over-
 // month chart, narrative/flags panel, and a next-month forecast card).
 //
-// Peru FX suite: the Overview tab is rebuilt to a premium, card-based design
-// (KpiCard / CategoryDonut / TrendArea / InsightCard / WalletSplit), a "Cambio"
-// tab renders the dual-currency converter (ConverterPanel), and CSV import is
-// dual-currency aware (rows are tagged PEN or USD).
+// Peru FX suite: the Overview tab is a premium, card-based design (KpiCard /
+// CategoryDonut / TrendArea / InsightCard / WalletSplit). Tipo de cambio and
+// AFP are surfaced inline at the top of the overview (FxWidget / AfpSummary)
+// instead of as menu tabs, and CSV import is dual-currency aware (rows are
+// tagged PEN or USD). The layout compacts to a single column on phones.
 //
 // Every API call goes through the typed apiGet/apiPost/apiUpload helpers
 // (JWT attached automatically), so this page also proves the JWT -> FastAPI
@@ -24,9 +25,9 @@ import { CategoryDonut } from "../components/CategoryDonut";
 import { TrendArea } from "../components/TrendArea";
 import { InsightCard } from "../components/InsightCard";
 import { WalletSplit } from "../components/WalletSplit";
-import { ConverterPanel } from "../components/ConverterPanel";
+import { FxWidget } from "../components/FxWidget";
+import { AfpSummary } from "../components/AfpSummary";
 import { ReceiptScanner } from "../components/ReceiptScanner";
-import { AfpPanel } from "../components/AfpPanel";
 import { SpendCalendar } from "../components/SpendCalendar";
 import { Greeting } from "../components/Greeting";
 import { WeeklyRecap } from "../components/WeeklyRecap";
@@ -70,10 +71,29 @@ interface Insights {
 }
 
 // The simple tabbed layout that holds the overview vs. the new feature panels.
-type Tab = "overview" | "cambio" | "afp" | "suscripciones" | "budgets" | "goals";
+type Tab = "overview" | "suscripciones" | "budgets" | "goals";
+
+// True when the viewport is phone-sized. Drives the compact, single-column
+// layout (stacked transaction cards, 2-col KPIs, trimmed padding). Listens for
+// viewport changes and cleans up on unmount.
+function useIsMobile(): boolean {
+  const query = "(max-width: 640px)";
+  const [isMobile, setIsMobile] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", onChange);
+    setIsMobile(mql.matches);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return isMobile;
+}
 
 export function Dashboard() {
   const { signOut } = useAuth();
+  const isMobile = useIsMobile();
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -213,10 +233,10 @@ export function Dashboard() {
     <div
       style={{
         maxWidth: 860,
-        margin: "40px auto",
+        margin: isMobile ? "16px auto" : "40px auto",
         fontFamily: "system-ui",
         color: tokens.colors.text,
-        padding: `0 ${tokens.spacing.lg}px`,
+        padding: `0 ${isMobile ? tokens.spacing.md : tokens.spacing.lg}px`,
       }}
     >
       <header
@@ -236,13 +256,17 @@ export function Dashboard() {
 
       {error && <p style={{ color: "crimson" }}>Error: {error}</p>}
 
-      {/* Tab bar: overview, the new Cambio converter, chat, budgets, goals. */}
+      {/* Tab bar: overview, suscripciones, budgets, goals. Horizontally
+          scrollable so tabs never wrap or break the layout on a phone. */}
       <nav
         style={{
           display: "flex",
+          flexWrap: "nowrap",
           gap: 8,
           marginTop: 24,
           borderBottom: `1px solid ${tokens.colors.border}`,
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
         }}
       >
         {TABS.map((t) => (
@@ -259,6 +283,7 @@ export function Dashboard() {
               background: "none",
               cursor: "pointer",
               fontWeight: tab === t.id ? 500 : 400,
+              whiteSpace: "nowrap",
               color: tab === t.id ? tokens.colors.text : tokens.colors.textMuted,
             }}
           >
@@ -269,6 +294,22 @@ export function Dashboard() {
 
       {tab === "overview" && (
         <>
+          {/* Tipo de cambio + AFP, surfaced inline (no menu): compact 2-up on
+              desktop, stacked on mobile, near the top so they're usable at a
+              glance. */}
+          <section
+            style={{
+              marginTop: tokens.spacing.lg,
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+              gap: tokens.spacing.md,
+              alignItems: "start",
+            }}
+          >
+            <FxWidget />
+            <AfpSummary currency={currency} />
+          </section>
+
           {/* AI chat — the centerpiece of the dashboard. */}
           <section style={{ marginTop: 24 }}>
             <ChatAssistant />
@@ -428,7 +469,9 @@ export function Dashboard() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                  gridTemplateColumns: isMobile
+                    ? "1fr 1fr"
+                    : "repeat(auto-fit, minmax(160px, 1fr))",
                   gap: tokens.spacing.md,
                   marginTop: tokens.spacing.lg,
                 }}
@@ -510,6 +553,105 @@ export function Dashboard() {
               <p style={{ color: tokens.colors.textMuted }}>
                 Aún no hay movimientos — importa un CSV arriba.
               </p>
+            ) : isMobile ? (
+              /* Stacked cards on a phone so nothing overflows horizontally. */
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: tokens.spacing.sm,
+                  marginTop: tokens.spacing.sm,
+                }}
+              >
+                {txns.map((t) => {
+                  const amount = Number(t.amount);
+                  return (
+                    <div
+                      key={t.id}
+                      style={{
+                        padding: tokens.spacing.md,
+                        background: tokens.colors.surface,
+                        border: `1px solid ${tokens.colors.border}`,
+                        borderRadius: tokens.radii.card,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: tokens.colors.textMuted,
+                          }}
+                        >
+                          {t.date}
+                        </span>
+                        <strong
+                          style={{
+                            color: amount < 0 ? "crimson" : "green",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {formatCurrency(amount, t.currency)}
+                        </strong>
+                      </div>
+                      <div style={{ fontWeight: 500 }}>{t.description}</div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: 4,
+                        }}
+                      >
+                        <SourceBadge source={t.source} />
+                        <CurrencyBadge currency={t.currency} />
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: tokens.colors.textMuted,
+                          }}
+                        >
+                          {categoryLabel(t.category)}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          gap: 6,
+                          marginTop: 2,
+                        }}
+                      >
+                        <button
+                          onClick={() => setEditor({ mode: "edit", txn: t })}
+                          style={{ fontSize: 12, padding: "4px 10px" }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTxn(t.id)}
+                          style={{
+                            fontSize: 12,
+                            padding: "4px 10px",
+                            color: "crimson",
+                          }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
@@ -583,8 +725,6 @@ export function Dashboard() {
         </>
       )}
 
-      {tab === "cambio" && <ConverterPanel />}
-      {tab === "afp" && <AfpPanel currency={currency} />}
       {tab === "suscripciones" && <SubscriptionsPanel />}
       {tab === "budgets" && <BudgetsPanel currency={currency} />}
       {tab === "goals" && <GoalsPanel currency={currency} />}
@@ -638,8 +778,6 @@ function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
 // Tab definitions, kept module-level so the render loop stays declarative.
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Resumen" },
-  { id: "cambio", label: "Cambio" },
-  { id: "afp", label: "AFP" },
   { id: "suscripciones", label: "Suscripciones" },
   { id: "budgets", label: "Presupuestos" },
   { id: "goals", label: "Metas" },

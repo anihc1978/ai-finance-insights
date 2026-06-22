@@ -57,7 +57,7 @@ const wrapperStyle: CSSProperties = {
 
 const headingStyle: CSSProperties = {
   margin: 0,
-  fontSize: 36,
+  fontSize: "clamp(26px, 7vw, 36px)",
   fontWeight: 800,
   lineHeight: 1.05,
   color: colors.accent,
