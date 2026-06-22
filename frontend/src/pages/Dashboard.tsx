@@ -32,6 +32,7 @@ import { SpendCalendar } from "../components/SpendCalendar";
 import { Greeting } from "../components/Greeting";
 import { WeeklyRecap } from "../components/WeeklyRecap";
 import { SubscriptionsPanel } from "../components/SubscriptionsPanel";
+import { AnalyticsPanel } from "../components/AnalyticsPanel";
 import { TransactionEditor } from "../components/TransactionEditor";
 import { SourceBadge, SOURCE_CHIPS } from "../components/SourceBadge";
 import { ProfileAvatar } from "../components/ProfileAvatar";
@@ -71,7 +72,7 @@ interface Insights {
 }
 
 // The simple tabbed layout that holds the overview vs. the new feature panels.
-type Tab = "overview" | "suscripciones" | "budgets" | "goals";
+type Tab = "overview" | "analisis" | "suscripciones" | "budgets" | "goals";
 
 // True when the viewport is phone-sized. Drives the compact, single-column
 // layout (stacked transaction cards, 2-col KPIs, trimmed padding). Listens for
@@ -725,6 +726,7 @@ export function Dashboard() {
         </>
       )}
 
+      {tab === "analisis" && <AnalyticsPanel />}
       {tab === "suscripciones" && <SubscriptionsPanel />}
       {tab === "budgets" && <BudgetsPanel currency={currency} />}
       {tab === "goals" && <GoalsPanel currency={currency} />}
@@ -778,6 +780,7 @@ function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
 // Tab definitions, kept module-level so the render loop stays declarative.
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Resumen" },
+  { id: "analisis", label: "📊 Análisis" },
   { id: "suscripciones", label: "Suscripciones" },
   { id: "budgets", label: "Presupuestos" },
   { id: "goals", label: "Metas" },
