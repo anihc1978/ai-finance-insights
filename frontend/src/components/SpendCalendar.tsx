@@ -116,7 +116,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
   // Switch to white text once the accent fill gets saturated enough to keep the
   // day number legible (the ramp goes dark/vivid quickly, so flip early).
   function cellText(spend: number): string {
-    if (spend <= 0) return tokens.colors.textMuted;
+    if (spend <= 0) return tokens.colors.text;
     const ratio = maxDay > 0 ? spend / maxDay : 0;
     return ratio > 0.35 ? "#FFFFFF" : tokens.colors.text;
   }
