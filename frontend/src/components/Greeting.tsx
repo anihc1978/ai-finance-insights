@@ -1,11 +1,10 @@
 // src/components/Greeting.tsx
 // ---------------------------------------------------------------------------
 // A personal, time-aware header: "Buenos días, Eduardo". The name comes from
-// localStorage (editable) and defaults to the capitalized local-part of the
-// logged-in email so it feels personal from the first load.
+// localStorage (editable) and defaults to "Eduardo" so it feels personal from
+// the first load.
 // ---------------------------------------------------------------------------
 import { useState } from "react";
-import { useAuth } from "../auth/AuthContext";
 import { tokens } from "../lib/theme";
 
 function timeGreeting(): string {
@@ -15,15 +14,9 @@ function timeGreeting(): string {
   return "Buenas noches";
 }
 
-function defaultName(email: string | undefined): string {
-  const local = (email ?? "").split("@")[0] ?? "";
-  return local ? local.charAt(0).toUpperCase() + local.slice(1) : "";
-}
-
 export function Greeting() {
-  const { session } = useAuth();
   const [name, setName] = useState<string>(
-    () => localStorage.getItem("fin_nombre") ?? defaultName(session?.user.email),
+    () => localStorage.getItem("fin_nombre") ?? "Eduardo",
   );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);

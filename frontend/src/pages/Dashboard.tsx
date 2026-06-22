@@ -32,6 +32,8 @@ import { Greeting } from "../components/Greeting";
 import { WeeklyRecap } from "../components/WeeklyRecap";
 import { SubscriptionsPanel } from "../components/SubscriptionsPanel";
 import { TransactionEditor } from "../components/TransactionEditor";
+import { SourceBadge, SOURCE_CHIPS } from "../components/SourceBadge";
+import { ProfileAvatar } from "../components/ProfileAvatar";
 import { tokens } from "../lib/theme";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 
@@ -47,6 +49,9 @@ interface Transaction {
   amount: number;
   category: string | null;
   currency: TxnCurrency;
+  // Where the movement came from (Yape/Plin/bank/AFP). The backend returns the
+  // canonical key (or null); the UI maps it to a brand chip via SourceBadge.
+  source: string | null;
 }
 
 // The shape of GET /insights (see the shared contract). Keeping it co-located
@@ -67,10 +72,9 @@ interface Insights {
 type Tab = "overview" | "cambio" | "afp" | "suscripciones" | "budgets" | "goals";
 
 export function Dashboard() {
-  const { session, signOut } = useAuth();
+  const { signOut } = useAuth();
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
@@ -81,6 +85,9 @@ export function Dashboard() {
   // Which currency the next CSV import is denominated in (PEN by default,
   // matching the backend column default). Separate from the display currency.
   const [importCurrency, setImportCurrency] = useState<TxnCurrency>("PEN");
+  // Which source (Yape/Plin/bank/AFP) the next CSV import should be tagged with.
+  // Empty = "Sin especificar" (let the backend detect per-row from descriptions).
+  const [importSource, setImportSource] = useState<string>("");
   const [tab, setTab] = useState<Tab>("overview");
   // Manual add/edit editor: null = closed; otherwise the mode + the row being
   // edited (undefined when adding a brand-new movement).
@@ -130,19 +137,11 @@ export function Dashboard() {
     }
   }
 
-  // Prove the JWT -> FastAPI round-trip: /me echoes back the authenticated
-  // user_id straight from the token the backend verified.
-  async function loadMe() {
-    const me = await apiGet<{ user_id: string; email: string }>("/me");
-    setUserId(me.user_id);
-  }
-
-  // Load everything once on mount. Transactions first, then insights/me.
+  // Load everything once on mount. Transactions first, then insights.
   useEffect(() => {
     (async () => {
       await loadTransactions();
       await loadInsights();
-      await loadMe();
     })().catch((e: unknown) => setError(String(e)));
   }, []);
 
@@ -156,6 +155,7 @@ export function Dashboard() {
     try {
       await apiUpload<{ imported: number }>("/transactions/import", file, {
         currency: importCurrency,
+        source: importSource,
       });
       await loadTransactions(); // refresh so the new rows appear
       await loadInsights(); // new data -> recompute insights
@@ -195,6 +195,19 @@ export function Dashboard() {
     .filter((t) => t.currency === "USD")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
+  // "Ingresos por fuente": group positive movements by their source key (skip
+  // rows with no detected source), summing the amount per source. Sorted by
+  // total descending so the biggest income source leads.
+  const incomeBySource = Object.entries(
+    txns
+      .filter((t) => Number(t.amount) > 0 && t.source)
+      .reduce<Record<string, number>>((acc, t) => {
+        const key = t.source as string;
+        acc[key] = (acc[key] ?? 0) + Number(t.amount);
+        return acc;
+      }, {}),
+  ).sort((a, b) => b[1] - a[1]);
+
   return (
     <div
       style={{
@@ -214,18 +227,10 @@ export function Dashboard() {
       >
         <Greeting />
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <ProfileAvatar />
           <button onClick={signOut}>Cerrar sesión</button>
         </div>
       </header>
-
-      <p style={{ color: tokens.colors.textMuted }}>
-        Sesión iniciada como: <strong>{session?.user.email}</strong>
-      </p>
-      {userId && (
-        <p style={{ color: tokens.colors.textMuted, fontSize: 13 }}>
-          user_id verificado desde FastAPI: <code>{userId}</code>
-        </p>
-      )}
 
       {error && <p style={{ color: "crimson" }}>Error: {error}</p>}
 
@@ -324,6 +329,36 @@ export function Dashboard() {
                   <option value="USD">USD (US$)</option>
                 </select>
               </label>
+              <label
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 13,
+                  color: tokens.colors.textMuted,
+                }}
+              >
+                Origen
+                <select
+                  value={importSource}
+                  onChange={(e) => setImportSource(e.target.value)}
+                  aria-label="Origen de importación"
+                  style={{
+                    padding: "6px 8px",
+                    fontSize: 14,
+                    borderRadius: 6,
+                    border: `1px solid ${tokens.colors.border}`,
+                    background: "white",
+                  }}
+                >
+                  <option value="">Sin especificar</option>
+                  {Object.entries(SOURCE_CHIPS).map(([key, chip]) => (
+                    <option key={key} value={key}>
+                      {chip.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {importing && <span>Importando…</span>}
             </div>
             <div style={{ marginTop: 12 }}>
@@ -346,6 +381,40 @@ export function Dashboard() {
 
           {/* Two wallets: S/ total and US$ total side by side. */}
           <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
+
+          {/* Ingresos por fuente: a mini-breakdown of where income comes from. */}
+          {incomeBySource.length > 0 && (
+            <section
+              style={{
+                marginTop: tokens.spacing.lg,
+                padding: tokens.spacing.lg,
+                background: tokens.colors.surface,
+                border: `1px solid ${tokens.colors.border}`,
+                borderRadius: tokens.radii.card,
+              }}
+            >
+              <h3 style={{ marginTop: 0, fontWeight: 500 }}>
+                Ingresos por fuente
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {incomeBySource.map(([key, total]) => (
+                  <div
+                    key={key}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <SourceBadge source={key} />
+                    <strong style={{ color: tokens.colors.text }}>
+                      {formatCurrency(total, currency)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Origin-style spend heatmap for the current month (soles). */}
           <SpendCalendar transactions={txns} />
@@ -468,6 +537,7 @@ export function Dashboard() {
                         <td style={{ padding: 8 }}>{t.date}</td>
                         <td style={{ padding: 8 }}>
                           {t.description}
+                          <SourceBadge source={t.source} />
                           <CurrencyBadge currency={t.currency} />
                         </td>
                         <td

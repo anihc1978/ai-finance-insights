@@ -34,6 +34,7 @@ from app.services.fx import get_official_history, get_rates
 from app.services.insights import build_insight
 from app.services.recap import weekly_recap
 from app.services.scanner import scan_receipt
+from app.services.source import detect_source
 from app.services.subscriptions import detect_subscriptions
 
 app = FastAPI(title="AI Finance Insights API")
@@ -67,6 +68,7 @@ def me(user: CurrentUser = Depends(get_current_user)):
 async def import_transactions(
     file: UploadFile = File(...),
     currency: str = Form("PEN"),
+    source: str = Form(""),
     user: CurrentUser = Depends(get_current_user),
 ):
     """Receive a CSV, parse it, and store each row as one of the user's transactions.
@@ -74,23 +76,30 @@ async def import_transactions(
     Every row in one import shares a single `currency` tag (PEN or USD). Anything
     other than USD falls back to the PEN default, so a bad/missing value can never
     write an invalid currency.
+
+    An optional `source` tags the whole statement (e.g. "bcp", "yape") so every
+    row's `raw.source_key` lets detect_source label it with a brand chip.
     """
     currency = currency if currency in ("PEN", "USD") else "PEN"
 
     contents = await file.read()  # raw bytes of the uploaded CSV
     try:
         df = pd.read_csv(io.BytesIO(contents), dtype=str)  # dtype=str keeps values JSON-safe
-        rows = [
-            {
-                "user_id": user.id,
-                "date": str(r["date"]),
-                "description": str(r["description"]),
-                "amount": float(r["amount"]),
-                "currency": currency,
-                "raw": r.to_dict(),
-            }
-            for _, r in df.iterrows()
-        ]
+        rows = []
+        for _, r in df.iterrows():
+            raw = r.to_dict()
+            if source:
+                raw["source_key"] = source
+            rows.append(
+                {
+                    "user_id": user.id,
+                    "date": str(r["date"]),
+                    "description": str(r["description"]),
+                    "amount": float(r["amount"]),
+                    "currency": currency,
+                    "raw": raw,
+                }
+            )
     except (KeyError, ValueError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
         # A bad/empty CSV or a non-numeric amount shouldn't 500 — tell the user.
         raise HTTPException(
@@ -188,15 +197,24 @@ def delete_transaction(txn_id: str, user: CurrentUser = Depends(get_current_user
 
 @app.get("/transactions")
 def list_transactions(user: CurrentUser = Depends(get_current_user)):
-    """Return the user's transactions, newest first (RLS scopes it to them)."""
+    """Return the user's transactions, newest first (RLS scopes it to them).
+
+    Each row gets a `source` key (a brand chip the frontend renders) computed
+    from its description + raw; the bulky raw itself is dropped from the response.
+    """
     res = (
         user_client(user.token)
         .table("transactions")
-        .select("id, date, description, amount, category, currency")
+        .select("id, date, description, amount, category, currency, raw")
         .order("date", desc=True)
         .execute()
     )
-    return {"transactions": res.data}
+    transactions = []
+    for row in res.data or []:
+        source = detect_source(row.get("description"), row.get("raw"))
+        row.pop("raw", None)
+        transactions.append({**row, "source": source})
+    return {"transactions": transactions}
 
 
 @app.post("/transactions/categorize")
