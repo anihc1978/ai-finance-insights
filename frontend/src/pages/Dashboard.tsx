@@ -231,6 +231,20 @@ export function Dashboard() {
       }, {}),
   ).sort((a, b) => b[1] - a[1]);
 
+  // Yape/Plin: how much money has flowed through each digital wallet — the
+  // running total Peru's bank/wallet apps don't surface. `out` = spent/sent,
+  // `inc` = received. Both wallets are always shown so the totals have a home.
+  const walletMovement = (["yape", "plin"] as const).map((key) => {
+    const rows = txns.filter((t) => t.source === key);
+    const out = rows
+      .filter((t) => Number(t.amount) < 0)
+      .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+    const inc = rows
+      .filter((t) => Number(t.amount) > 0)
+      .reduce((s, t) => s + Number(t.amount), 0);
+    return { key, out, inc, count: rows.length };
+  });
+
   return (
     <div
       style={{
@@ -355,6 +369,79 @@ export function Dashboard() {
           {/* Tus billeteras — directly after Esta semana, same section treatment. */}
           <section style={{ marginTop: 16 }}>
             <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
+          </section>
+
+          {/* Yape y Plin: total moved through each digital wallet — the running
+              total the bank apps don't show. */}
+          <section
+            style={{
+              marginTop: 16,
+              padding: tokens.spacing.lg,
+              background: tokens.colors.surface,
+              border: `1px solid ${tokens.colors.border}`,
+              borderRadius: tokens.radii.card,
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 2, fontWeight: 500 }}>
+              Yape y Plin
+            </h3>
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: 13,
+                color: tokens.colors.textMuted,
+              }}
+            >
+              Lo que has gastado y enviado por cada billetera.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                gap: tokens.spacing.md,
+              }}
+            >
+              {walletMovement.map((w) => (
+                <div
+                  key={w.key}
+                  style={{
+                    padding: tokens.spacing.md,
+                    background: tokens.colors.cardBg,
+                    border: `1px solid ${tokens.colors.border}`,
+                    borderRadius: tokens.radii.card,
+                  }}
+                >
+                  <SourceBadge source={w.key} />
+                  <p
+                    style={{
+                      margin: "10px 0 0",
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                      color: tokens.colors.textMuted,
+                    }}
+                  >
+                    Gastado / enviado
+                  </p>
+                  <p style={{ margin: "2px 0 2px", fontSize: 24, fontWeight: 600 }}>
+                    {formatCurrency(w.out, currency)}
+                  </p>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: tokens.colors.textMuted,
+                    }}
+                  >
+                    {w.count}{" "}
+                    {w.count === 1 ? "movimiento" : "movimientos"}
+                    {w.inc > 0
+                      ? ` · recibido ${formatCurrency(w.inc, currency)}`
+                      : ""}
+                  </p>
+                </div>
+              ))}
+            </div>
           </section>
 
           {/* Próximos pagos: alertas de pagos y recordatorios próximos. */}
