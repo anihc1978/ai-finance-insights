@@ -295,9 +295,13 @@ export function Dashboard() {
 
       {tab === "overview" && (
         <>
-          {/* KPI metric cards: Spent / Income / Saved / Forecast — on top so the
-              money summary is the first thing seen. Only shown once the backend
-              has data to analyze. */}
+          {/* AI chat — the centerpiece, placed on top above the numbers. */}
+          <section style={{ marginTop: tokens.spacing.lg }}>
+            <ChatAssistant />
+          </section>
+
+          {/* KPI metric cards: Spent / Income / Saved / Forecast. Only shown
+              once the backend has data to analyze. */}
           {insights && (
             <div
               style={{
@@ -401,11 +405,6 @@ export function Dashboard() {
 
           {/* Origin-style spend heatmap for the current month (soles). */}
           <SpendCalendar transactions={txns} />
-
-          {/* AI chat — the centerpiece of the dashboard. */}
-          <section style={{ marginTop: 24 }}>
-            <ChatAssistant />
-          </section>
 
           {/* AI insight panels — only shown once the backend has data to analyze. */}
           {insights && (
