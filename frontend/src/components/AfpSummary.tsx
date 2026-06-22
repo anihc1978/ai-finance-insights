@@ -12,7 +12,7 @@
 // the same endpoint when the modal opens. After the modal closes we refresh
 // the card so a freshly-saved/deleted record is reflected. Spanish labels.
 // ---------------------------------------------------------------------------
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { apiGet } from "../lib/api";
 import { formatCurrency, type Currency } from "../lib/format";
 import { tokens } from "../lib/theme";
@@ -38,19 +38,19 @@ const MESES = [
 function monthLabel(as_of: string): string {
   const parts = as_of.split("-");
   const idx = Math.max(0, Math.min(11, Number(parts[1]) - 1));
-  return `${MESES[idx]} ${parts[0]}`;
+  return `${MESES[idx]}. ${parts[0]}`;
 }
 
-// Example "AFP Integra" monthly saldos (mirrors the full panel's sample) shown
-// when there are no real records, so the card has a month-by-month column
-// instead of a big empty space below the total.
-const EXAMPLE_MONTHS: { as_of: string; balance: number }[] = [
-  { as_of: "2026-01-31", balance: 12540 },
-  { as_of: "2026-02-28", balance: 13180 },
-  { as_of: "2026-03-31", balance: 13690 },
-  { as_of: "2026-04-30", balance: 14420 },
-  { as_of: "2026-05-31", balance: 15010 },
-  { as_of: "2026-06-30", balance: 15640 },
+// Example "AFP Integra" monthly aporte + saldo (mirrors the full panel's sample)
+// shown when there are no real records, so the card previews a month-by-month
+// table instead of a big empty space below the total.
+const EXAMPLE_MONTHS: { as_of: string; aporte: number; balance: number }[] = [
+  { as_of: "2026-01-31", aporte: 430, balance: 12540 },
+  { as_of: "2026-02-28", aporte: 430, balance: 13180 },
+  { as_of: "2026-03-31", aporte: 430, balance: 13690 },
+  { as_of: "2026-04-30", aporte: 430, balance: 14420 },
+  { as_of: "2026-05-31", aporte: 430, balance: 15010 },
+  { as_of: "2026-06-30", aporte: 430, balance: 15640 },
 ];
 
 export function AfpSummary({ currency }: AfpSummaryProps) {
@@ -92,13 +92,22 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
   // state — so the dashboard card isn't empty before the first real entry.
   const EXAMPLE_TOTAL = 15640;
   const showExample = loaded && !hasData;
-  // The month-by-month column shown below the total: real records when present,
-  // else the Integra example. Last 6 months keep the card compact.
-  const monthRows: { as_of: string; balance: number }[] = hasData
-    ? records.slice(-6).map((r) => ({ as_of: r.as_of, balance: r.balance }))
-    : showExample
-    ? EXAMPLE_MONTHS
-    : [];
+  // Preview table below the total (Mes | Aporte | Saldo | Variación), last 3
+  // months. Variación = saldo − saldo del mes anterior (computed over the full
+  // series, then sliced). Aporte only exists in the example; real records don't
+  // carry it, so it shows "—".
+  const fullSeries: { as_of: string; aporte: number | null; balance: number }[] =
+    hasData
+      ? records.map((r) => ({ as_of: r.as_of, aporte: null, balance: r.balance }))
+      : showExample
+      ? EXAMPLE_MONTHS.map((r) => ({ ...r }))
+      : [];
+  const monthRows = fullSeries
+    .map((r, i) => ({
+      ...r,
+      variacion: i > 0 ? r.balance - fullSeries[i - 1].balance : null,
+    }))
+    .slice(-3);
 
   return (
     <>
@@ -176,34 +185,59 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
               )}
             </div>
 
-            {/* Month-by-month column so the card isn't empty below the total. */}
+            {/* Preview table (Mes | Aporte | Saldo | Variación) so the card
+                isn't empty below the total. */}
             {monthRows.length > 0 && (
               <div
                 style={{
                   marginTop: 10,
                   paddingTop: 8,
                   borderTop: `1px solid ${tokens.colors.border}`,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr 1fr 1fr",
+                  columnGap: tokens.spacing.sm,
+                  rowGap: 4,
+                  fontSize: 11,
                 }}
               >
+                <span style={{ color: tokens.colors.textMuted }}>Mes</span>
+                <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
+                  Aporte
+                </span>
+                <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
+                  Saldo
+                </span>
+                <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
+                  Variación
+                </span>
                 {monthRows.map((r) => (
-                  <div
-                    key={r.as_of}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: 12,
-                    }}
-                  >
-                    <span style={{ color: tokens.colors.textMuted }}>
-                      {monthLabel(r.as_of)}
+                  <Fragment key={r.as_of}>
+                    <span style={{ color: tokens.colors.text }}>{monthLabel(r.as_of)}</span>
+                    <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
+                      {r.aporte != null ? formatCurrency(r.aporte, currency) : "—"}
                     </span>
-                    <span style={{ color: tokens.colors.text }}>
+                    <span style={{ color: tokens.colors.text, textAlign: "right" }}>
                       {formatCurrency(r.balance, currency)}
                     </span>
-                  </div>
+                    <span
+                      style={{
+                        textAlign: "right",
+                        color:
+                          r.variacion == null
+                            ? tokens.colors.textMuted
+                            : r.variacion >= 0
+                            ? tokens.colors.up
+                            : tokens.colors.down,
+                      }}
+                    >
+                      {r.variacion == null
+                        ? "—"
+                        : `${r.variacion >= 0 ? "+" : "−"}${formatCurrency(
+                            Math.abs(r.variacion),
+                            currency,
+                          )}`}
+                    </span>
+                  </Fragment>
                 ))}
               </div>
             )}
