@@ -28,6 +28,9 @@ import { ConverterPanel } from "../components/ConverterPanel";
 import { ReceiptScanner } from "../components/ReceiptScanner";
 import { AfpPanel } from "../components/AfpPanel";
 import { SpendCalendar } from "../components/SpendCalendar";
+import { Greeting } from "../components/Greeting";
+import { WeeklyRecap } from "../components/WeeklyRecap";
+import { SubscriptionsPanel } from "../components/SubscriptionsPanel";
 import { TransactionEditor } from "../components/TransactionEditor";
 import { tokens } from "../lib/theme";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
@@ -61,7 +64,7 @@ interface Insights {
 }
 
 // The simple tabbed layout that holds the overview vs. the new feature panels.
-type Tab = "overview" | "cambio" | "afp" | "chat" | "budgets" | "goals";
+type Tab = "overview" | "cambio" | "afp" | "suscripciones" | "budgets" | "goals";
 
 export function Dashboard() {
   const { session, signOut } = useAuth();
@@ -209,7 +212,7 @@ export function Dashboard() {
           alignItems: "center",
         }}
       >
-        <h1 style={{ margin: 0, fontWeight: 500 }}>Panel</h1>
+        <Greeting />
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <button onClick={signOut}>Cerrar sesión</button>
         </div>
@@ -259,6 +262,15 @@ export function Dashboard() {
 
       {tab === "overview" && (
         <>
+          {/* AI chat — the centerpiece of the dashboard. */}
+          <section style={{ marginTop: 24 }}>
+            <ChatAssistant />
+          </section>
+
+          <section style={{ marginTop: 16 }}>
+            <WeeklyRecap />
+          </section>
+
           {/* Import — dual-currency aware: the picker tags the next upload. */}
           <section
             style={{
@@ -501,7 +513,7 @@ export function Dashboard() {
 
       {tab === "cambio" && <ConverterPanel />}
       {tab === "afp" && <AfpPanel currency={currency} />}
-      {tab === "chat" && <ChatAssistant />}
+      {tab === "suscripciones" && <SubscriptionsPanel />}
       {tab === "budgets" && <BudgetsPanel currency={currency} />}
       {tab === "goals" && <GoalsPanel currency={currency} />}
 
@@ -556,7 +568,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Resumen" },
   { id: "cambio", label: "Cambio" },
   { id: "afp", label: "AFP" },
-  { id: "chat", label: "Chat" },
+  { id: "suscripciones", label: "Suscripciones" },
   { id: "budgets", label: "Presupuestos" },
   { id: "goals", label: "Metas" },
 ];

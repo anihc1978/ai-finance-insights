@@ -32,7 +32,9 @@ from app.services.categorizer import categorize
 from app.services.chat import build_chat_reply
 from app.services.fx import get_official_history, get_rates
 from app.services.insights import build_insight
+from app.services.recap import weekly_recap
 from app.services.scanner import scan_receipt
+from app.services.subscriptions import detect_subscriptions
 
 app = FastAPI(title="AI Finance Insights API")
 
@@ -275,6 +277,43 @@ async def get_insights(
         pass
 
     return insight
+
+
+@app.get("/subscriptions")
+def get_subscriptions(user: CurrentUser = Depends(get_current_user)):
+    """Detect recurring subscriptions from the user's transactions (pure Python).
+
+    Computed on the fly from spend rows — no schema/table of its own. The detector
+    groups by normalized description and flags monthly-cadence (or known-keyword)
+    charges, returning {subscriptions, monthly_total}.
+    """
+    txns = (
+        user_client(user.token)
+        .table("transactions")
+        .select("date, description, amount, category")
+        .order("date", desc=False)
+        .execute()
+    ).data or []
+
+    return detect_subscriptions(txns)
+
+
+@app.get("/recap/weekly")
+async def get_weekly_recap(user: CurrentUser = Depends(get_current_user)):
+    """A short AI recap of the latest 7-day window in the user's transactions.
+
+    The window/totals are pure Python; one Claude call writes the narrative (and
+    tolerates failure). Returns {start, end, total, byCategory, narrative}.
+    """
+    txns = (
+        user_client(user.token)
+        .table("transactions")
+        .select("date, description, amount, category")
+        .order("date", desc=False)
+        .execute()
+    ).data or []
+
+    return await weekly_recap(txns)
 
 
 # ---------------------------------------------------------------------------
