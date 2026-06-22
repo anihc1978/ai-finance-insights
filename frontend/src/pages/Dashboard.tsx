@@ -295,9 +295,97 @@ export function Dashboard() {
 
       {tab === "overview" && (
         <>
+          {/* KPI metric cards: Spent / Income / Saved / Forecast — on top so the
+              money summary is the first thing seen. Only shown once the backend
+              has data to analyze. */}
+          {insights && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile
+                  ? "1fr 1fr"
+                  : "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: tokens.spacing.md,
+                marginTop: tokens.spacing.lg,
+              }}
+            >
+              <KpiCard
+                label="Gastado"
+                value={formatCurrency(insights.totalSpend, currency)}
+              />
+              <KpiCard
+                label="Ingresos"
+                value={formatCurrency(insights.totalIncome, currency)}
+              />
+              <KpiCard
+                label="Ahorrado"
+                value={formatCurrency(
+                  insights.totalIncome - insights.totalSpend,
+                  currency,
+                )}
+                trend={{
+                  dir:
+                    insights.totalIncome - insights.totalSpend > 0
+                      ? "up"
+                      : insights.totalIncome - insights.totalSpend < 0
+                        ? "down"
+                        : "flat",
+                  text:
+                    insights.totalIncome - insights.totalSpend >= 0
+                      ? "Saldo positivo"
+                      : "Saldo negativo",
+                }}
+              />
+              <KpiCard
+                label="Pronóstico próximo mes"
+                value={formatCurrency(insights.forecastNextMonth, currency)}
+              />
+            </div>
+          )}
+
+          <section style={{ marginTop: 16 }}>
+            <WeeklyRecap />
+          </section>
+
+          {/* Two wallets: S/ total and US$ total side by side. */}
+          <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
+
+          {/* Ingresos por fuente: a mini-breakdown of where income comes from. */}
+          {incomeBySource.length > 0 && (
+            <section
+              style={{
+                marginTop: tokens.spacing.lg,
+                padding: tokens.spacing.lg,
+                background: tokens.colors.surface,
+                border: `1px solid ${tokens.colors.border}`,
+                borderRadius: tokens.radii.card,
+              }}
+            >
+              <h3 style={{ marginTop: 0, fontWeight: 500 }}>
+                Ingresos por fuente
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {incomeBySource.map(([key, total]) => (
+                  <div
+                    key={key}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <SourceBadge source={key} />
+                    <strong style={{ color: tokens.colors.text }}>
+                      {formatCurrency(total, currency)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Tipo de cambio + AFP, surfaced inline (no menu): compact 2-up on
-              desktop, stacked on mobile, near the top so they're usable at a
-              glance. */}
+              desktop, stacked on mobile. */}
           <section
             style={{
               marginTop: tokens.spacing.lg,
@@ -311,14 +399,41 @@ export function Dashboard() {
             <AfpSummary currency={currency} />
           </section>
 
+          {/* Origin-style spend heatmap for the current month (soles). */}
+          <SpendCalendar transactions={txns} />
+
           {/* AI chat — the centerpiece of the dashboard. */}
           <section style={{ marginTop: 24 }}>
             <ChatAssistant />
           </section>
 
-          <section style={{ marginTop: 16 }}>
-            <WeeklyRecap />
-          </section>
+          {/* AI insight panels — only shown once the backend has data to analyze. */}
+          {insights && (
+            <>
+              {/* Spending mix + month-over-month trend. */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                  gap: tokens.spacing.md,
+                  marginTop: tokens.spacing.lg,
+                }}
+              >
+                <CategoryDonut data={insights.byCategory} currency={currency} />
+                <TrendArea
+                  data={insights.monthOverMonth}
+                  currency={currency}
+                />
+              </div>
+
+              {/* Claude's "Esto encontramos" highlights + narrative + flags. */}
+              <InsightCard
+                narrative={insights.narrative}
+                flags={insights.flags}
+                highlights={insights.highlights ?? []}
+              />
+            </>
+          )}
 
           {/* Import — dual-currency aware: the picker tags the next upload. */}
           <section
@@ -422,118 +537,6 @@ export function Dashboard() {
               <ReceiptScanner onImported={loadTransactions} />
             </div>
           </section>
-
-          {/* Two wallets: S/ total and US$ total side by side. */}
-          <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
-
-          {/* Ingresos por fuente: a mini-breakdown of where income comes from. */}
-          {incomeBySource.length > 0 && (
-            <section
-              style={{
-                marginTop: tokens.spacing.lg,
-                padding: tokens.spacing.lg,
-                background: tokens.colors.surface,
-                border: `1px solid ${tokens.colors.border}`,
-                borderRadius: tokens.radii.card,
-              }}
-            >
-              <h3 style={{ marginTop: 0, fontWeight: 500 }}>
-                Ingresos por fuente
-              </h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {incomeBySource.map(([key, total]) => (
-                  <div
-                    key={key}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <SourceBadge source={key} />
-                    <strong style={{ color: tokens.colors.text }}>
-                      {formatCurrency(total, currency)}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Origin-style spend heatmap for the current month (soles). */}
-          <SpendCalendar transactions={txns} />
-
-          {/* AI insight panels — only shown once the backend has data to analyze. */}
-          {insights && (
-            <>
-              {/* KPI metric cards: Spent / Income / Saved / Forecast. */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile
-                    ? "1fr 1fr"
-                    : "repeat(auto-fit, minmax(160px, 1fr))",
-                  gap: tokens.spacing.md,
-                  marginTop: tokens.spacing.lg,
-                }}
-              >
-                <KpiCard
-                  label="Gastado"
-                  value={formatCurrency(insights.totalSpend, currency)}
-                />
-                <KpiCard
-                  label="Ingresos"
-                  value={formatCurrency(insights.totalIncome, currency)}
-                />
-                <KpiCard
-                  label="Ahorrado"
-                  value={formatCurrency(
-                    insights.totalIncome - insights.totalSpend,
-                    currency,
-                  )}
-                  trend={{
-                    dir:
-                      insights.totalIncome - insights.totalSpend > 0
-                        ? "up"
-                        : insights.totalIncome - insights.totalSpend < 0
-                          ? "down"
-                          : "flat",
-                    text:
-                      insights.totalIncome - insights.totalSpend >= 0
-                        ? "Saldo positivo"
-                        : "Saldo negativo",
-                  }}
-                />
-                <KpiCard
-                  label="Pronóstico próximo mes"
-                  value={formatCurrency(insights.forecastNextMonth, currency)}
-                />
-              </div>
-
-              {/* Spending mix + month-over-month trend. */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                  gap: tokens.spacing.md,
-                  marginTop: tokens.spacing.lg,
-                }}
-              >
-                <CategoryDonut data={insights.byCategory} currency={currency} />
-                <TrendArea
-                  data={insights.monthOverMonth}
-                  currency={currency}
-                />
-              </div>
-
-              {/* Claude's "Esto encontramos" highlights + narrative + flags. */}
-              <InsightCard
-                narrative={insights.narrative}
-                flags={insights.flags}
-                highlights={insights.highlights ?? []}
-              />
-            </>
-          )}
 
           <section style={{ marginTop: 24 }}>
             <div

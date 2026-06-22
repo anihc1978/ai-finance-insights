@@ -97,20 +97,26 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
   const monthTotal = Object.values(spendByDay).reduce((s, v) => s + v, 0);
   const maxDay = Math.max(0, ...Object.values(spendByDay));
 
-  // Heatmap fill: stronger teal for bigger spend. Returns a background colour.
+  // Heatmap fill: a vivid spend-heat ramp derived from the theme accent so it
+  // re-themes in light/dark. We mix the accent INTO the surface, starting at a
+  // clearly-tinted 40% floor (so even the smallest spend reads as "spent") and
+  // ramping to a solid, saturated 100% accent on the busiest day. Mixing in
+  // srgb against the surface (not a low alpha over white) keeps the strong end
+  // bold instead of washed out.
   function cellBg(spend: number): string {
     if (spend <= 0) return tokens.colors.surface;
     const ratio = maxDay > 0 ? spend / maxDay : 0;
-    // 0.15..1.0 alpha so even small spends are visible but the biggest is solid.
-    const alpha = 0.15 + ratio * 0.85;
-    return `rgba(29, 158, 117, ${alpha.toFixed(2)})`; // accent teal #1D9E75
+    // 40%..100% accent — a strong floor so busy days clearly stand out.
+    const pct = Math.round(40 + ratio * 60);
+    return `color-mix(in srgb, ${tokens.colors.accent} ${pct}%, ${tokens.colors.surface})`;
   }
 
-  // White text once the teal gets dark enough to keep the day number readable.
+  // Switch to white text once the accent fill gets saturated enough to keep the
+  // day number legible (the ramp goes dark/vivid quickly, so flip early).
   function cellText(spend: number): string {
     if (spend <= 0) return tokens.colors.textMuted;
     const ratio = maxDay > 0 ? spend / maxDay : 0;
-    return ratio > 0.55 ? "#FFFFFF" : tokens.colors.text;
+    return ratio > 0.35 ? "#FFFFFF" : tokens.colors.text;
   }
 
   // Build the cell list: leading blanks then each day.
