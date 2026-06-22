@@ -30,8 +30,32 @@ interface AfpRecord {
   afp_name: string | null;
 }
 
+// Spanish month labels, locale-free so they never render in English.
+const MESES = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+];
+function monthLabel(as_of: string): string {
+  const parts = as_of.split("-");
+  const idx = Math.max(0, Math.min(11, Number(parts[1]) - 1));
+  return `${MESES[idx]} ${parts[0]}`;
+}
+
+// Example "AFP Integra" monthly saldos (mirrors the full panel's sample) shown
+// when there are no real records, so the card has a month-by-month column
+// instead of a big empty space below the total.
+const EXAMPLE_MONTHS: { as_of: string; balance: number }[] = [
+  { as_of: "2026-01-31", balance: 12540 },
+  { as_of: "2026-02-28", balance: 13180 },
+  { as_of: "2026-03-31", balance: 13690 },
+  { as_of: "2026-04-30", balance: 14420 },
+  { as_of: "2026-05-31", balance: 15010 },
+  { as_of: "2026-06-30", balance: 15640 },
+];
+
 export function AfpSummary({ currency }: AfpSummaryProps) {
   const [latest, setLatest] = useState<AfpRecord | null>(null);
+  const [records, setRecords] = useState<AfpRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -39,10 +63,12 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
     try {
       // GET /afp returns records ordered by as_of asc, so the last is latest.
       const data = await apiGet<{ records: AfpRecord[] }>("/afp");
+      setRecords(data.records);
       setLatest(data.records.length ? data.records[data.records.length - 1] : null);
     } catch {
       // A failed fetch just means we show the neutral "sin datos" state; the
       // full panel (which surfaces errors) is one tap away.
+      setRecords([]);
       setLatest(null);
     } finally {
       setLoaded(true);
@@ -66,6 +92,13 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
   // state — so the dashboard card isn't empty before the first real entry.
   const EXAMPLE_TOTAL = 15640;
   const showExample = loaded && !hasData;
+  // The month-by-month column shown below the total: real records when present,
+  // else the Integra example. Last 6 months keep the card compact.
+  const monthRows: { as_of: string; balance: number }[] = hasData
+    ? records.slice(-6).map((r) => ({ as_of: r.as_of, balance: r.balance }))
+    : showExample
+    ? EXAMPLE_MONTHS
+    : [];
 
   return (
     <>
@@ -78,7 +111,7 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
           // 2-up row (the grid stretches both cells); content spreads top→bottom.
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           height: "100%",
           width: "100%",
           textAlign: "left",
@@ -111,24 +144,9 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
           <span style={{ fontSize: 13, color: tokens.colors.accent }}>Ver →</span>
         </div>
 
-        {hasData ? (
+        {loaded ? (
           <>
-            <div
-              style={{
-                marginTop: 4,
-                fontSize: 22,
-                fontWeight: 600,
-                color: tokens.colors.text,
-              }}
-            >
-              {formatCurrency(latest.balance, currency)}
-            </div>
-            <div style={{ marginTop: 2, fontSize: 12, color: tokens.colors.textMuted }}>
-              Saldo al {latest.as_of}
-            </div>
-          </>
-        ) : showExample ? (
-          <>
+            {/* Total balance (real latest, or the Integra example). */}
             <div
               style={{
                 marginTop: 4,
@@ -139,24 +157,61 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
               }}
             >
               <span style={{ fontSize: 22, fontWeight: 600, color: tokens.colors.text }}>
-                {formatCurrency(EXAMPLE_TOTAL, currency)}
+                {formatCurrency(latest ? latest.balance : EXAMPLE_TOTAL, currency)}
               </span>
-              <span
+              {showExample && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: tokens.colors.accent,
+                    background: tokens.colors.surface,
+                    border: `1px solid ${tokens.colors.border}`,
+                    borderRadius: tokens.radii.chip,
+                    padding: "2px 8px",
+                  }}
+                >
+                  ejemplo
+                </span>
+              )}
+            </div>
+
+            {/* Month-by-month column so the card isn't empty below the total. */}
+            {monthRows.length > 0 && (
+              <div
                 style={{
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: tokens.colors.accent,
-                  background: tokens.colors.surface,
-                  border: `1px solid ${tokens.colors.border}`,
-                  borderRadius: tokens.radii.chip,
-                  padding: "2px 8px",
+                  marginTop: 10,
+                  paddingTop: 8,
+                  borderTop: `1px solid ${tokens.colors.border}`,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
                 }}
               >
-                ejemplo
-              </span>
-            </div>
-            <div style={{ marginTop: 2, fontSize: 12, color: tokens.colors.textMuted }}>
-              Agrega tu AFP — escanea tu estado de cuenta.
+                {monthRows.map((r) => (
+                  <div
+                    key={r.as_of}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: 12,
+                    }}
+                  >
+                    <span style={{ color: tokens.colors.textMuted }}>
+                      {monthLabel(r.as_of)}
+                    </span>
+                    <span style={{ color: tokens.colors.text }}>
+                      {formatCurrency(r.balance, currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: 8, fontSize: 12, color: tokens.colors.textMuted }}>
+              {latest
+                ? `Saldo al ${latest.as_of}`
+                : "Agrega tu AFP — escanea tu estado de cuenta."}
             </div>
           </>
         ) : (
