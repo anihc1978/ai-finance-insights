@@ -31,6 +31,7 @@ import { ReceiptScanner } from "../components/ReceiptScanner";
 import { SpendCalendar } from "../components/SpendCalendar";
 import { Greeting } from "../components/Greeting";
 import { WeeklyRecap } from "../components/WeeklyRecap";
+import { UpcomingPayments } from "../components/UpcomingPayments";
 import { SubscriptionsPanel } from "../components/SubscriptionsPanel";
 import { AnalyticsPanel } from "../components/AnalyticsPanel";
 import { TransactionEditor } from "../components/TransactionEditor";
@@ -349,6 +350,11 @@ export function Dashboard() {
 
           <section style={{ marginTop: 16 }}>
             <WeeklyRecap />
+          </section>
+
+          {/* Próximos pagos: alertas de pagos y recordatorios próximos. */}
+          <section style={{ marginTop: tokens.spacing.lg }}>
+            <UpcomingPayments />
           </section>
 
           {/* Two wallets: S/ total and US$ total side by side. */}
