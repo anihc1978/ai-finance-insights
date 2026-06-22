@@ -34,6 +34,7 @@ import { SubscriptionsPanel } from "../components/SubscriptionsPanel";
 import { TransactionEditor } from "../components/TransactionEditor";
 import { SourceBadge, SOURCE_CHIPS } from "../components/SourceBadge";
 import { ProfileAvatar } from "../components/ProfileAvatar";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { tokens } from "../lib/theme";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 
@@ -227,6 +228,7 @@ export function Dashboard() {
       >
         <Greeting />
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <ThemeToggle />
           <ProfileAvatar />
           <button onClick={signOut}>Cerrar sesión</button>
         </div>

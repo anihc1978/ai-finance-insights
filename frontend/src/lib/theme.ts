@@ -20,19 +20,22 @@ export const categoryColors: Record<string, string> = {
 
 export const tokens = {
   colors: {
+    // All themeable colours read from CSS variables defined in index.css.
+    // Light values live in :root; [data-theme="dark"] overrides them. This lets
+    // the whole app re-theme at runtime with zero per-component edits.
     // Single accent.
-    accent: "#1D9E75",
+    accent: "var(--c-accent)",
     // Text.
-    text: "#1A1A19", // charcoal primary
-    textMuted: "#6B6B68", // muted secondary
+    text: "var(--c-text)", // charcoal primary
+    textMuted: "var(--c-text-muted)", // muted secondary
     // Surfaces.
-    cardBg: "#FFFFFF",
-    surface: "#F6F6F4", // soft surface for KPI cards
-    border: "#E6E6E2", // 1px hairline
+    cardBg: "var(--c-card)",
+    surface: "var(--c-surface)", // soft surface for KPI cards
+    border: "var(--c-border)", // 1px hairline
     // Trend chips.
-    up: "#1D9E75",
-    down: "#D85A30",
-    flat: "#888780",
+    up: "var(--c-up)",
+    down: "var(--c-down)",
+    flat: "var(--c-flat)",
   },
   radii: {
     card: 12,
@@ -51,3 +54,41 @@ export const tokens = {
 } as const;
 
 export type Tokens = typeof tokens;
+
+// ---------------------------------------------------------------------------
+// Theme system — light/dark, switchable at runtime via a data-attribute on
+// <html>. The actual colour values live as CSS variables in index.css; here we
+// only flip the attribute and remember the choice.
+// ---------------------------------------------------------------------------
+
+export type ThemeName = "light" | "dark";
+
+const THEME_KEY = "fin_theme";
+
+/** Apply a theme: set <html data-theme> and persist the choice. */
+export function applyTheme(name: ThemeName): void {
+  document.documentElement.dataset.theme = name;
+  try {
+    localStorage.setItem(THEME_KEY, name);
+  } catch {
+    // localStorage may be unavailable (private mode); theme still applies.
+  }
+}
+
+/** Read the theme currently applied to <html>, defaulting to "light". */
+export function getCurrentTheme(): ThemeName {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+/** Decide the initial theme: saved choice, else the OS preference. */
+export function getInitialTheme(): ThemeName {
+  try {
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark") return saved;
+  } catch {
+    // ignore and fall back to system preference
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}

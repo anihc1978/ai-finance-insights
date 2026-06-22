@@ -1,0 +1,58 @@
+/* index.css — global theme variables + base page styles.
+   ------------------------------------------------------------------
+   The whole app themes itself through these CSS variables. tokens.colors.*
+   (src/lib/theme.ts) point at them, so flipping <html data-theme="dark">
+   re-colours every component that reads a token. categoryColors and
+   SourceBadge brand colours stay concrete on purpose — they look the same
+   on both themes.
+   ------------------------------------------------------------------ */
+
+/* LIGHT ("claro") — default. */
+:root {
+  --c-bg: #fafaf7; /* warm off-white */
+  --c-surface: #ffffff;
+  --c-card: #ffffff;
+  --c-text: #1a1c1e; /* near-black ink */
+  --c-text-muted: #6a7178; /* muted secondary */
+  --c-border: #ececE7; /* hairline */
+  --c-accent: #1d9e75; /* fintech green */
+  --c-up: #1d9e75;
+  --c-down: #dc5b4b;
+  --c-flat: #8a8f96;
+}
+
+/* DARK ("oscuro"). */
+:root[data-theme="dark"] {
+  --c-bg: #0d0f11; /* near-black, not pure */
+  --c-surface: #15181b;
+  --c-card: #181b1f;
+  --c-text: #eceef0;
+  --c-text-muted: #99a0a6;
+  --c-border: #262a2e; /* soft border */
+  --c-accent: #2bb98a; /* brighter green for contrast */
+  --c-up: #2bb98a;
+  --c-down: #f0705f;
+  --c-flat: #7c838a;
+}
+
+html {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: var(--c-bg);
+  color: var(--c-text);
+  font-family:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Smooth swap when the theme toggles. */
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}

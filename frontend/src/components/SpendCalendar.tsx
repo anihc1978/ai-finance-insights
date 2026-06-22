@@ -1,11 +1,14 @@
 // src/components/SpendCalendar.tsx
 // ---------------------------------------------------------------------------
-// Origin-style spend heatmap for the CURRENT month. Each day cell shows the day
+// Origin-style spend heatmap with month navigation. Each day cell shows the day
 // number plus that day's total SPEND in soles (sum of -amount for PEN rows on
 // that date), shaded as a teal heatmap — more spend = stronger fill. Empty days
 // stay faint. Weekday-aligned (Lun..Dom), with the Spanish month name + total.
-// Presentational only — caller passes the raw transactions.
+// The viewed month is navigable with ‹ / › chevrons; it seeds from the latest
+// month that actually has spend (else the current month). Presentational only —
+// caller passes the raw transactions and the calendar groups them client-side.
 // ---------------------------------------------------------------------------
+import { useState } from "react";
 import { tokens } from "../lib/theme";
 import { formatCurrency } from "../lib/format";
 
@@ -37,17 +40,48 @@ function mondayIndex(jsDay: number): number {
   return (jsDay + 6) % 7;
 }
 
-export function SpendCalendar({ transactions }: SpendCalendarProps) {
+// "YYYY-MM" for a 0-based month.
+function monthKey(year: number, month0: number): string {
+  return `${year}-${String(month0 + 1).padStart(2, "0")}`;
+}
+
+// Latest "YYYY-MM" among PEN spend rows, else the current month.
+function initialViewMonth(
+  transactions: SpendCalendarProps["transactions"]
+): string {
+  let latest = "";
+  for (const t of transactions) {
+    if (t.currency !== "PEN") continue;
+    if (Number(t.amount) >= 0) continue; // income/transfers in — not spend
+    const ym = t.date.slice(0, 7); // "YYYY-MM"
+    if (ym.length === 7 && ym > latest) latest = ym;
+  }
+  if (latest) return latest;
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth(); // 0-based
+  return monthKey(now.getFullYear(), now.getMonth());
+}
+
+export function SpendCalendar({ transactions }: SpendCalendarProps) {
+  const [viewMonth, setViewMonth] = useState<string>(() =>
+    initialViewMonth(transactions)
+  );
+
+  const [yStr, mStr] = viewMonth.split("-");
+  const year = Number(yStr);
+  const month = Number(mStr) - 1; // 0-based
+
+  // Step the viewed month back/forward, normalising year rollover.
+  function shiftMonth(delta: number): void {
+    const next = new Date(year, month + delta, 1);
+    setViewMonth(monthKey(next.getFullYear(), next.getMonth()));
+  }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   // How many blank cells before day 1 so the 1st sits under its weekday.
   const leadingBlanks = mondayIndex(new Date(year, month, 1).getDay());
 
   // Sum spend (positive number of soles) per day-of-month for PEN rows in the
-  // current month. amount is negative for spend, so we negate and keep only the
+  // viewed month. amount is negative for spend, so we negate and keep only the
   // outflows.
   const spendByDay: Record<number, number> = {};
   for (const t of transactions) {
@@ -86,6 +120,23 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
     cells.push({ day: d, spend: spendByDay[d] ?? 0 });
   }
 
+  // Shared chevron button style — square, hairline, themes via tokens.
+  const chevronStyle: React.CSSProperties = {
+    width: 28,
+    height: 28,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 16,
+    lineHeight: 1,
+    cursor: "pointer",
+    color: tokens.colors.textMuted,
+    background: tokens.colors.surface,
+    border: `1px solid ${tokens.colors.border}`,
+    borderRadius: tokens.radii.input,
+    padding: 0,
+  };
+
   return (
     <section
       style={{
@@ -100,21 +151,43 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "baseline",
+          alignItems: "center",
           marginBottom: tokens.spacing.md,
         }}
       >
-        <h3
-          style={{
-            margin: 0,
-            fontSize: 15,
-            fontWeight: 500,
-            color: tokens.colors.text,
-            textTransform: "capitalize",
-          }}
-        >
-          {MONTH_NAMES[month]} {year}
-        </h3>
+        <div style={{ display: "flex", alignItems: "center", gap: tokens.spacing.sm }}>
+          <button
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            title="Mes anterior"
+            aria-label="Mes anterior"
+            style={chevronStyle}
+          >
+            ‹
+          </button>
+          <h3
+            style={{
+              margin: 0,
+              minWidth: 130,
+              textAlign: "center",
+              fontSize: 15,
+              fontWeight: 500,
+              color: tokens.colors.text,
+              textTransform: "capitalize",
+            }}
+          >
+            {MONTH_NAMES[month]} {year}
+          </h3>
+          <button
+            type="button"
+            onClick={() => shiftMonth(1)}
+            title="Mes siguiente"
+            aria-label="Mes siguiente"
+            style={chevronStyle}
+          >
+            ›
+          </button>
+        </div>
         <span style={{ fontSize: 14, fontWeight: 500, color: tokens.colors.accent }}>
           {formatCurrency(monthTotal, "PEN")}
         </span>
