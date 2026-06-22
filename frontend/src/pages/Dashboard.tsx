@@ -491,7 +491,7 @@ export function Dashboard() {
               display: "grid",
               gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
               gap: tokens.spacing.md,
-              alignItems: "start",
+              alignItems: "stretch",
             }}
           >
             <FxWidget />

@@ -74,7 +74,12 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
         onClick={() => setOpen(true)}
         style={{
           // Full-width, card-styled, but a real button so it's obviously tappable.
-          display: "block",
+          // Flex column + full height so it matches the Fx widget's height in the
+          // 2-up row (the grid stretches both cells); content spreads top→bottom.
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          height: "100%",
           width: "100%",
           textAlign: "left",
           background: tokens.colors.cardBg,
