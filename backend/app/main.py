@@ -5,6 +5,7 @@ Run locally:  uvicorn app.main:app --reload --port 8000
 """
 import io
 import json
+import logging
 from datetime import datetime
 
 import pandas as pd
@@ -33,9 +34,12 @@ from app.services.chat import build_chat_reply
 from app.services.fx import get_official_history, get_rates
 from app.services.insights import build_insight
 from app.services.recap import weekly_recap
+from app.services.rules import apply_rules, learn_rule
 from app.services.scanner import scan_receipt
 from app.services.source import detect_source
 from app.services.subscriptions import detect_subscriptions
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Finance Insights API")
 
@@ -110,7 +114,22 @@ async def import_transactions(
     if not rows:
         return {"imported": 0}
 
-    user_client(user.token).table("transactions").insert(rows).execute()
+    client = user_client(user.token)
+    inserted = client.table("transactions").insert(rows).execute().data or []
+
+    # Auto-categorize the newly-added uncategorized rows so the user never sees a
+    # wall of "Other". Best-effort: any failure here must NOT fail the import.
+    try:
+        todo = [
+            {"id": r["id"], "description": r.get("description", "")}
+            for r in inserted
+            if not r.get("category")
+        ]
+        if todo:
+            await categorize_transactions(client, user, todo)
+    except Exception as exc:  # noqa: BLE001 — auto-categorize is best-effort
+        logger.warning("import: auto-categorize failed (rows still imported): %s", exc)
+
     return {"imported": len(rows)}
 
 
@@ -217,14 +236,52 @@ def list_transactions(user: CurrentUser = Depends(get_current_user)):
     return {"transactions": transactions}
 
 
-@app.post("/transactions/categorize")
-async def categorize_transactions(user: CurrentUser = Depends(get_current_user)):
-    """
-    Label every still-uncategorized transaction via one Claude call.
+async def categorize_transactions(client, user: CurrentUser, todo: list[dict]) -> dict[str, str]:
+    """Categorize a list of uncategorized transactions (rules first, then AI, then learn).
 
-    We pull only the rows where category IS NULL, ask the categorizer for a
-    {id: category} map, then write each label back. Returns how many we set so
-    the UI can report progress.
+    `todo` = [{id, description}, ...]. The pipeline:
+      1. apply_rules — deterministically label any txn whose merchant matches a
+         saved rule (no AI, no cost). Graceful: missing rules table -> {}.
+      2. AI-categorize ONLY the remaining rows via the existing Claude haiku call.
+      3. learn_rule from each AI result (upsert) so recurring merchants become
+         deterministic next time. Best-effort; missing table no-ops.
+      4. persist every label back to transactions (RLS-scoped via `client`).
+    Returns {txn_id: category} for everything labelled (rules + AI).
+    """
+    if not todo:
+        return {}
+
+    by_id = {str(t["id"]): t for t in todo}
+
+    # 1. Rules first — free, deterministic, consistent for recurring merchants.
+    rule_labels = apply_rules(client, todo)
+
+    # 2. AI only for what no rule covered.
+    remaining = [t for tid, t in by_id.items() if tid not in rule_labels]
+    ai_labels = await categorize(remaining) if remaining else {}
+
+    # 3. Learn a rule from each AI result so next time it's deterministic (no cost).
+    for txn_id, category in ai_labels.items():
+        txn = by_id.get(txn_id)
+        if txn and category and category != "Other":
+            learn_rule(client, txn.get("description", ""), category, user.id)
+
+    # 4. Persist every label (rules + AI) back to the transactions.
+    labels = {**rule_labels, **ai_labels}
+    for txn_id, category in labels.items():
+        client.table("transactions").update({"category": category}).eq("id", txn_id).execute()
+
+    return labels
+
+
+@app.post("/transactions/categorize")
+async def categorize_transactions_route(user: CurrentUser = Depends(get_current_user)):
+    """
+    Label every still-uncategorized transaction (rules first, then one Claude call).
+
+    Pulls the rows where category IS NULL and runs the shared categorize pipeline,
+    which applies saved merchant rules for free before paying for AI. Returns how
+    many we set so the UI can report progress.
     """
     client = user_client(user.token)
 
@@ -238,11 +295,46 @@ async def categorize_transactions(user: CurrentUser = Depends(get_current_user))
     if not todo:
         return {"categorized": 0}
 
-    labels = await categorize(todo)
-    for txn_id, category in labels.items():
-        client.table("transactions").update({"category": category}).eq("id", txn_id).execute()
-
+    labels = await categorize_transactions(client, user, todo)
     return {"categorized": len(labels)}
+
+
+class CategorizeSimilarBody(BaseModel):
+    category: str
+
+
+@app.post("/transactions/{txn_id}/categorize-similar")
+def categorize_similar(
+    txn_id: str,
+    body: CategorizeSimilarBody,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Set this transaction's category AND learn a rule ("apply to all like this").
+
+    Sets the category on the given transaction, then upserts a merchant rule from
+    its description so similar future movements auto-categorize. Graceful: the
+    category is always set even if the rule upsert fails (e.g. table not migrated).
+    404 if the transaction doesn't exist.
+    """
+    client = user_client(user.token)
+
+    res = (
+        client.table("transactions")
+        .update({"category": body.category})
+        .eq("id", txn_id)
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction not found",
+        )
+
+    # Best-effort: learn the rule so similar movements auto-categorize going forward.
+    # learn_rule swallows a missing table internally, so the category above always sticks.
+    learn_rule(client, res.data[0].get("description", ""), body.category, user.id)
+
+    return {"transaction": res.data[0]}
 
 
 @app.get("/insights")
@@ -713,7 +805,20 @@ async def scan_receipts(
         )
 
     if rows:
-        client.table("transactions").insert(rows).execute()
+        inserted = client.table("transactions").insert(rows).execute().data or []
+
+        # Auto-categorize the newly-saved receipts so they don't all read "Other".
+        # Best-effort: a categorization failure must NOT fail the scan.
+        try:
+            todo = [
+                {"id": r["id"], "description": r.get("description", "")}
+                for r in inserted
+                if not r.get("category")
+            ]
+            if todo:
+                await categorize_transactions(client, user, todo)
+        except Exception as exc:  # noqa: BLE001 — auto-categorize is best-effort
+            logger.warning("scan: auto-categorize failed (receipts still saved): %s", exc)
 
     return {"imported": len(rows), "skipped_duplicates": skipped, "items": items}
 

@@ -612,7 +612,7 @@ export function Dashboard() {
                   ))}
                 </select>
               </label>
-              {importing && <span>Importando…</span>}
+              {importing && <span>Importando y categorizando con IA…</span>}
             </div>
             <div style={{ marginTop: 12 }}>
               <button onClick={handleCategorize} disabled={categorizing}>

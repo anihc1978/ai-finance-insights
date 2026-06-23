@@ -82,6 +82,9 @@ export function TransactionEditor({
   const [currency, setCurrency] = useState<TxnCurrency>(
     initial?.currency ?? "PEN",
   );
+  // "Aplicar a movimientos parecidos": when editing and the user picks a
+  // category, this creates a rule so future similar movements auto-categorize.
+  const [applySimilar, setApplySimilar] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,6 +122,14 @@ export function TransactionEditor({
           `/transactions/${initial.id}`,
           body,
         );
+        // "Aplicar a movimientos parecidos": also create a rule so future
+        // similar movements auto-categorize. Only meaningful with a category.
+        if (applySimilar && body.category) {
+          await apiPost<{ category: string }, unknown>(
+            `/transactions/${initial.id}/categorize-similar`,
+            { category: body.category },
+          );
+        }
       }
       onSaved();
     } catch (e: unknown) {
@@ -241,6 +252,28 @@ export function TransactionEditor({
                 </option>
               ))}
             </select>
+            {mode === "edit" && (
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: tokens.spacing.sm,
+                  fontSize: 13,
+                  color: tokens.colors.textMuted,
+                  cursor: category ? "pointer" : "not-allowed",
+                  opacity: category ? 1 : 0.55,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={applySimilar}
+                  disabled={!category}
+                  onChange={(e) => setApplySimilar(e.target.checked)}
+                />
+                Aplicar a movimientos parecidos
+              </label>
+            )}
           </div>
         </div>
 

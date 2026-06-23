@@ -133,3 +133,39 @@ alter table public.afp_records enable row level security;
 drop policy if exists "own afp - all" on public.afp_records;
 create policy "own afp - all" on public.afp_records for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ---- category_rules: learned merchant → category rules (auto-categorization) -
+-- Origin-style deterministic categorization. When the AI categorizes a movement
+-- (e.g. "STARBUCKS LIMA 0423" → Coffee), we upsert a rule keyed by a normalized
+-- merchant key ("starbucks") so future matching movements are categorized
+-- instantly, with no AI cost. UNIQUE(user_id, match_key) powers the upsert.
+create table if not exists public.category_rules (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  match_key   text not null,                   -- normalize_merchant(description)
+  category    text not null,
+  created_at  timestamptz default now(),
+  unique (user_id, match_key)
+);
+
+-- Index for the common lookup: "my rules" (then matched by match_key in app code)
+create index if not exists category_rules_user_idx
+  on public.category_rules (user_id);
+
+alter table public.category_rules enable row level security;
+
+-- Owner-scoped: a user can only ever touch their own rules (auth.uid() = user_id).
+-- Granular per-operation policies (matching the transactions pattern above),
+-- each dropped-if-exists first so this file stays safe to re-run.
+drop policy if exists "own category_rules - select" on public.category_rules;
+create policy "own category_rules - select"
+  on public.category_rules for select using (auth.uid() = user_id);
+drop policy if exists "own category_rules - insert" on public.category_rules;
+create policy "own category_rules - insert"
+  on public.category_rules for insert with check (auth.uid() = user_id);
+drop policy if exists "own category_rules - update" on public.category_rules;
+create policy "own category_rules - update"
+  on public.category_rules for update using (auth.uid() = user_id);
+drop policy if exists "own category_rules - delete" on public.category_rules;
+create policy "own category_rules - delete"
+  on public.category_rules for delete using (auth.uid() = user_id);
