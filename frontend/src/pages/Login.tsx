@@ -68,6 +68,14 @@ export function Login() {
       >
         {mode === "login" ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
       </button>
+
+      <p style={{ color: "#888", fontSize: 13, marginTop: 24 }}>
+        Versión beta. Al continuar aceptas nuestro{" "}
+        <a href="/privacidad.html" target="_blank" rel="noopener noreferrer" style={{ color: "#2e5c8a" }}>
+          aviso de privacidad
+        </a>
+        .
+      </p>
     </div>
   );
 }

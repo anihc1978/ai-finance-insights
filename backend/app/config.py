@@ -5,11 +5,14 @@ Using pydantic-settings means config is *validated* at startup — if a required
 secret is missing, the app fails fast with a clear error instead of blowing up
 mid-request. This is the kind of production hygiene senior reviewers look for.
 """
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", populate_by_name=True
+    )
 
     # Supabase project settings (from your Supabase dashboard → Project Settings → API)
     supabase_url: str
@@ -26,8 +29,11 @@ class Settings(BaseSettings):
     # OPERATOR: in production, APPEND your deployed frontend origin here via the
     # ALLOWED_ORIGINS env var, e.g.
     #   ALLOWED_ORIGINS="https://your-app.vercel.app,http://localhost:5173"
-    allowed_origins_csv: str = (
-        "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    allowed_origins_csv: str = Field(
+        default="http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173",
+        # Read from the ALLOWED_ORIGINS env var (the name used in .env.example,
+        # render.yaml and DEPLOY.md); ALLOWED_ORIGINS_CSV also accepted.
+        validation_alias=AliasChoices("ALLOWED_ORIGINS", "ALLOWED_ORIGINS_CSV"),
     )
     # Back-compat: an older CORS_ORIGINS env var. If set, it's merged in too.
     cors_origins: str = ""

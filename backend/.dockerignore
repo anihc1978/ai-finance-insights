@@ -1,0 +1,23 @@
+# Keep the build context small and secrets out of the image.
+.venv/
+venv/
+.venv-check/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets — NEVER copy real keys into the image.
+.env
+*.env
+
+# Tests are not needed in the runtime image.
+tests/
+
+# Local/dev cruft and host-specific config.
+.DS_Store
+runtime.txt
+railway.json
+Procfile
+Dockerfile
+.dockerignore

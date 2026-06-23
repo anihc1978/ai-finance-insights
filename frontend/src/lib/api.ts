@@ -7,7 +7,10 @@
 // ---------------------------------------------------------------------------
 import { supabase } from "./supabase";
 
-const API_BASE = import.meta.env.VITE_API_BASE as string; // e.g. http://localhost:8000
+// In production set VITE_API_BASE to the deployed backend URL. For local dev we
+// fall back to the localhost backend so `npm run dev` works without a .env file.
+const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
 
 /**
  * Grab the current access token (JWT) from the Supabase session.

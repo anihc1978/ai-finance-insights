@@ -18,5 +18,7 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: CORS_ORIGINS
+      # CORS allowlist: set to your deployed frontend origin(s), comma-separated.
+      # e.g. https://your-app.netlify.app  (config.py reads ALLOWED_ORIGINS)
+      - key: ALLOWED_ORIGINS
         sync: false
