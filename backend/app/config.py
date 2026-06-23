@@ -16,17 +16,40 @@ class Settings(BaseSettings):
     supabase_anon_key: str            # publishable key — lets the backend talk to the DB as the user (RLS)
     supabase_jwt_secret: str = ""     # legacy HS256 secret — unused now (modern Supabase signs ES256; auth.py verifies via JWKS)
 
-    # Anthropic (used from Milestone 3 onward)
+    # Anthropic (used from Milestone 3 onward). SERVER-SIDE secret — never log,
+    # return, or surface this in an error message.
     anthropic_api_key: str = ""
 
-    # CORS: comma-separated list of allowed origins. Override in production via the
-    # CORS_ORIGINS env var, e.g. "https://your-app.vercel.app,http://localhost:5173".
-    cors_origins: str = "http://localhost:5173"
+    # CORS: comma-separated allowlist of origins. We auth with Bearer tokens (not
+    # cookies), so this is a simple explicit allowlist — never "*". Defaults cover
+    # the local Vite/CRA dev servers.
+    # OPERATOR: in production, APPEND your deployed frontend origin here via the
+    # ALLOWED_ORIGINS env var, e.g.
+    #   ALLOWED_ORIGINS="https://your-app.vercel.app,http://localhost:5173"
+    allowed_origins_csv: str = (
+        "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    )
+    # Back-compat: an older CORS_ORIGINS env var. If set, it's merged in too.
+    cors_origins: str = ""
+
+    # --- Rate limiting (in-memory, per-instance — see services/ratelimit.py) ---
+    # Defaults are deliberately generous so normal use (and the test-suite) never
+    # trips them. A test can shrink these via env / Settings override to assert 429.
+    rate_limit_enabled: bool = True
+    rate_limit_window_seconds: int = 60
+    rate_limit_general: int = 120      # broad limit: requests / window / caller
+    rate_limit_ai: int = 20            # stricter limit for the expensive AI endpoints
 
     @property
     def allowed_origins(self) -> list[str]:
-        """cors_origins (comma-separated string) -> list, for CORSMiddleware."""
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        """Allowlist (comma-separated strings) -> de-duped list, for CORSMiddleware."""
+        raw = f"{self.allowed_origins_csv},{self.cors_origins}"
+        seen: list[str] = []
+        for o in raw.split(","):
+            o = o.strip()
+            if o and o not in seen:
+                seen.append(o)
+        return seen
 
 
 settings = Settings()  # raises at import time if required vars are missing

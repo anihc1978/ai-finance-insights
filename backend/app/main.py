@@ -10,11 +10,13 @@ from datetime import datetime
 
 import pandas as pd
 from anthropic import AsyncAnthropic
-from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, status
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import get_current_user, CurrentUser
+from app.services.ratelimit import ai_rate_limit, general_rate_limit
 from app.config import (
     CURRENCY_SYMBOLS,
     DEFAULT_CURRENCY,
@@ -41,16 +43,48 @@ from app.services.subscriptions import detect_subscriptions
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="AI Finance Insights API")
+# Broad per-caller rate limit applied to EVERY route (keyed by user id, or by
+# client IP when unauthenticated). The stricter AI limit is added per-endpoint
+# below. See app/services/ratelimit.py — in-memory, per-instance.
+app = FastAPI(
+    title="AI Finance Insights API",
+    dependencies=[Depends(general_rate_limit)],
+)
 
-# Allow the React dev server (Vite default port 5173) to call this API.
+# CORS: explicit allowlist from settings (ALLOWED_ORIGINS env), never "*".
+# Local dev origins are allowed by default; the operator appends the deployed
+# frontend origin in prod (see app/config.py / ALLOWED_ORIGINS).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,   # ["http://localhost:5173"] in dev; CORS_ORIGINS in prod
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Add a couple of cheap, always-safe security headers to every response."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Fallback for unexpected errors: log the detail server-side, return a generic
+    message to the client so no stack trace / internal detail (or secret) leaks.
+
+    HTTPExceptions raised by routes are handled by FastAPI's own handler and keep
+    their intended status/detail — this only catches the unexpected ones.
+    """
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Ocurrió un error inesperado. Intenta de nuevo."},
+    )
 
 
 @app.get("/health")
@@ -74,6 +108,7 @@ async def import_transactions(
     currency: str = Form("PEN"),
     source: str = Form(""),
     user: CurrentUser = Depends(get_current_user),
+    _ai: None = Depends(ai_rate_limit),   # auto-categorizes → counts as an AI call
 ):
     """Receive a CSV, parse it, and store each row as one of the user's transactions.
 
@@ -275,7 +310,10 @@ async def categorize_transactions(client, user: CurrentUser, todo: list[dict]) -
 
 
 @app.post("/transactions/categorize")
-async def categorize_transactions_route(user: CurrentUser = Depends(get_current_user)):
+async def categorize_transactions_route(
+    user: CurrentUser = Depends(get_current_user),
+    _ai: None = Depends(ai_rate_limit),
+):
     """
     Label every still-uncategorized transaction (rules first, then one Claude call).
 
@@ -341,6 +379,7 @@ def categorize_similar(
 async def get_insights(
     month: str | None = None,
     user: CurrentUser = Depends(get_current_user),
+    _ai: None = Depends(ai_rate_limit),
 ):
     """
     Monthly spending summary + AI narrative for `month` (default: latest month
@@ -409,7 +448,10 @@ def get_subscriptions(user: CurrentUser = Depends(get_current_user)):
 
 
 @app.get("/recap/weekly")
-async def get_weekly_recap(user: CurrentUser = Depends(get_current_user)):
+async def get_weekly_recap(
+    user: CurrentUser = Depends(get_current_user),
+    _ai: None = Depends(ai_rate_limit),
+):
     """A short AI recap of the latest 7-day window in the user's transactions.
 
     The window/totals are pure Python; one Claude call writes the narrative (and
@@ -522,7 +564,11 @@ def update_profile(body: ProfileBody, user: CurrentUser = Depends(get_current_us
 
 
 @app.post("/chat")
-async def chat(body: ChatBody, user: CurrentUser = Depends(get_current_user)):
+async def chat(
+    body: ChatBody,
+    user: CurrentUser = Depends(get_current_user),
+    _ai: None = Depends(ai_rate_limit),
+):
     """Conversational money assistant: a Claude tool-use loop over the user's data."""
     client = user_client(user.token)
 
@@ -718,6 +764,7 @@ _MAX_SCAN_FILES = 25                 # max receipts per /scan-receipts request
 async def scan_receipts(
     files: list[UploadFile] = File(...),
     user: CurrentUser = Depends(get_current_user),
+    _ai: None = Depends(ai_rate_limit),
 ):
     """Scan one or more Yape/Plin receipt screenshots into PEN transactions.
 
