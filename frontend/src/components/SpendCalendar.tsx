@@ -84,6 +84,10 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
     initialViewMonth(transactions)
   );
   const isMobile = useIsMobile();
+  // On phones the calendar grid is tall, so it starts collapsed — tap to expand.
+  const [open, setOpen] = useState(false);
+  // The day the user tapped, so we can show its amount (mobile cells hide it).
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const [yStr, mStr] = viewMonth.split("-");
   const year = Number(yStr);
@@ -93,6 +97,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
   function shiftMonth(delta: number): void {
     const next = new Date(year, month + delta, 1);
     setViewMonth(monthKey(next.getFullYear(), next.getMonth()));
+    setSelectedDay(null);
   }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -174,127 +179,197 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
         borderRadius: tokens.radii.card,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: tokens.spacing.md,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: tokens.spacing.sm }}>
-          <button
-            type="button"
-            onClick={() => shiftMonth(-1)}
-            title="Mes anterior"
-            aria-label="Mes anterior"
-            style={chevronStyle}
-          >
-            ‹
-          </button>
-          <h3
+      {isMobile && !open ? (
+        // Collapsed on mobile: a compact tappable bar so the tall grid doesn't
+        // eat the screen. Tap to expand.
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          style={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: tokens.spacing.sm,
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            color: tokens.colors.text,
+            font: "inherit",
+          }}
+        >
+          <span style={{ fontWeight: 500, textTransform: "capitalize" }}>
+            Calendario · {MONTH_NAMES[month]} {year}
+          </span>
+          <span
             style={{
-              margin: 0,
-              minWidth: 130,
-              textAlign: "center",
-              fontSize: 15,
               fontWeight: 500,
-              color: tokens.colors.text,
-              textTransform: "capitalize",
+              color: tokens.colors.accent,
+              whiteSpace: "nowrap",
             }}
           >
-            {MONTH_NAMES[month]} {year}
-          </h3>
-          <button
-            type="button"
-            onClick={() => shiftMonth(1)}
-            title="Mes siguiente"
-            aria-label="Mes siguiente"
-            style={chevronStyle}
-          >
-            ›
-          </button>
-        </div>
-        <span style={{ fontSize: 14, fontWeight: 500, color: tokens.colors.accent }}>
-          {formatCurrency(monthTotal, "PEN")}
-        </span>
-      </div>
-
-      {/* Weekday headers */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 6,
-          marginBottom: 6,
-        }}
-      >
-        {WEEKDAYS.map((w) => (
+            {formatCurrency(monthTotal, "PEN")} ›
+          </span>
+        </button>
+      ) : (
+        <>
           <div
-            key={w}
             style={{
-              textAlign: "center",
-              fontSize: 11,
-              fontWeight: 500,
-              color: tokens.colors.textMuted,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: tokens.spacing.md,
             }}
           >
-            {w}
-          </div>
-        ))}
-      </div>
-
-      {/* Day grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: 6,
-        }}
-      >
-        {cells.map((cell, i) => {
-          if (!cell) {
-            return <div key={`blank-${i}`} />;
-          }
-          const hasSpend = cell.spend > 0;
-          return (
-            <div
-              key={cell.day}
-              title={
-                hasSpend
-                  ? `${cell.day}: ${formatCurrency(cell.spend, "PEN")}`
-                  : `${cell.day}: sin gasto`
-              }
-              style={{
-                minHeight: 56,
-                padding: 6,
-                borderRadius: tokens.radii.input,
-                background: cellBg(cell.spend),
-                border: `1px solid ${tokens.colors.border}`,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                color: cellText(cell.spend),
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 500 }}>{cell.day}</span>
-              {hasSpend && !isMobile && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
+            <div style={{ display: "flex", alignItems: "center", gap: tokens.spacing.sm }}>
+              <button
+                type="button"
+                onClick={() => shiftMonth(-1)}
+                title="Mes anterior"
+                aria-label="Mes anterior"
+                style={chevronStyle}
+              >
+                ‹
+              </button>
+              <h3
+                style={{
+                  margin: 0,
+                  minWidth: 130,
+                  textAlign: "center",
+                  fontSize: 15,
+                  fontWeight: 500,
+                  color: tokens.colors.text,
+                  textTransform: "capitalize",
+                }}
+              >
+                {MONTH_NAMES[month]} {year}
+              </h3>
+              <button
+                type="button"
+                onClick={() => shiftMonth(1)}
+                title="Mes siguiente"
+                aria-label="Mes siguiente"
+                style={chevronStyle}
+              >
+                ›
+              </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: tokens.spacing.sm }}>
+              <span style={{ fontSize: 14, fontWeight: 500, color: tokens.colors.accent }}>
+                {formatCurrency(monthTotal, "PEN")}
+              </span>
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  title="Ocultar calendario"
+                  aria-label="Ocultar calendario"
+                  style={chevronStyle}
                 >
-                  {formatCurrency(cell.spend, "PEN")}
-                </span>
+                  ▾
+                </button>
               )}
             </div>
-          );
-        })}
-      </div>
+          </div>
+
+          {/* Weekday headers */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 6,
+              marginBottom: 6,
+            }}
+          >
+            {WEEKDAYS.map((w) => (
+              <div
+                key={w}
+                style={{
+                  textAlign: "center",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: tokens.colors.textMuted,
+                }}
+              >
+                {w}
+              </div>
+            ))}
+          </div>
+
+          {/* Day grid */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 6,
+            }}
+          >
+            {cells.map((cell, i) => {
+              if (!cell) {
+                return <div key={`blank-${i}`} />;
+              }
+              const hasSpend = cell.spend > 0;
+              const isSelected = selectedDay === cell.day;
+              return (
+                <div
+                  key={cell.day}
+                  onClick={() => setSelectedDay(cell.day)}
+                  title={
+                    hasSpend
+                      ? `${cell.day}: ${formatCurrency(cell.spend, "PEN")}`
+                      : `${cell.day}: sin gasto`
+                  }
+                  style={{
+                    minHeight: 56,
+                    padding: 6,
+                    borderRadius: tokens.radii.input,
+                    background: cellBg(cell.spend),
+                    border: isSelected
+                      ? `2px solid ${tokens.colors.accent}`
+                      : `1px solid ${tokens.colors.border}`,
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    color: cellText(cell.spend),
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 500 }}>{cell.day}</span>
+                  {hasSpend && !isMobile && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 500,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {formatCurrency(cell.spend, "PEN")}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tap-a-day readout — mobile cells don't show the amount inline. */}
+          {isMobile && selectedDay != null && (
+            <div style={{ marginTop: 10, fontSize: 13, color: tokens.colors.textMuted }}>
+              <strong
+                style={{ color: tokens.colors.text, textTransform: "capitalize" }}
+              >
+                {selectedDay} {MONTH_NAMES[month]}
+              </strong>
+              {": "}
+              {spendByDay[selectedDay]
+                ? formatCurrency(spendByDay[selectedDay], "PEN")
+                : "sin gasto"}
+            </div>
+          )}
+        </>
+      )}
     </section>
   );
 }
