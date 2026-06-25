@@ -337,6 +337,34 @@ async def categorize_transactions_route(
     return {"categorized": len(labels)}
 
 
+@app.post("/transactions/recategorize")
+async def recategorize_transactions_route(
+    user: CurrentUser = Depends(get_current_user),
+    _ai: None = Depends(ai_rate_limit),
+):
+    """Re-categorize rows that are uncategorized OR stuck in the catch-all 'Other'.
+
+    Same pipeline as /transactions/categorize, but also re-does rows previously
+    labelled 'Other' (e.g. data imported before auto-categorization existed), so a
+    user can relabel old movements in one tap. Rows with a real category are left
+    untouched.
+    """
+    client = user_client(user.token)
+
+    todo = (
+        client.table("transactions")
+        .select("id, description")
+        .or_("category.is.null,category.eq.Other")
+        .execute()
+    ).data or []
+
+    if not todo:
+        return {"categorized": 0}
+
+    labels = await categorize_transactions(client, user, todo)
+    return {"categorized": len(labels)}
+
+
 class CategorizeSimilarBody(BaseModel):
     category: str
 

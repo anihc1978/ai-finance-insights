@@ -101,6 +101,7 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
+  const [recategorizing, setRecategorizing] = useState(false);
   // Display currency is fixed to soles (S/). We don't offer a global toggle —
   // it only relabelled amounts (S/100 -> "$100") without converting, which was
   // misleading. Each row still shows in its own currency via t.currency.
@@ -206,6 +207,25 @@ export function Dashboard() {
       setError(String(err));
     } finally {
       setCategorizing(false);
+    }
+  }
+
+  // Re-categorize everything still in the catch-all "Other" (plus any null),
+  // e.g. data imported before auto-categorization existed.
+  async function handleRecategorize() {
+    setRecategorizing(true);
+    setError(null);
+    try {
+      await apiPost<Record<string, never>, { categorized: number }>(
+        "/transactions/recategorize",
+        {},
+      );
+      await loadTransactions();
+      await loadInsights();
+    } catch (err: unknown) {
+      setError(String(err));
+    } finally {
+      setRecategorizing(false);
     }
   }
 
@@ -655,9 +675,16 @@ export function Dashboard() {
               </label>
               {importing && <span>Importando y categorizando con IA…</span>}
             </div>
-            <div style={{ marginTop: 12 }}>
-              <button onClick={handleCategorize} disabled={categorizing}>
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={handleCategorize} disabled={categorizing || recategorizing}>
                 {categorizing ? "Categorizando…" : "Categorizar con IA"}
+              </button>
+              <button
+                onClick={handleRecategorize}
+                disabled={categorizing || recategorizing}
+                title="Relabel old movements stuck in 'Otros'"
+              >
+                {recategorizing ? "Re-categorizando…" : "Re-categorizar todo"}
               </button>
             </div>
 
