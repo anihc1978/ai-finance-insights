@@ -260,10 +260,19 @@ export function Dashboard() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
         <Greeting />
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <ThemeToggle />
           <ProfileAvatar />
           <button onClick={signOut}>Cerrar sesión</button>

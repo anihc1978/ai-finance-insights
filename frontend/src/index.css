@@ -7,6 +7,23 @@
    on both themes.
    ------------------------------------------------------------------ */
 
+/* Global box model + horizontal-overflow guard (mobile fit). border-box means
+   padding never adds to an element's width, so width:100% + padding can't push
+   past a phone screen; the body guard stops any stray element from creating a
+   sideways scroll. (Child scroll containers like the tab bar keep their own
+   overflow:auto.) */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* LIGHT ("claro") — default. */
 :root {
   --c-bg: #fafaf7; /* warm off-white */
