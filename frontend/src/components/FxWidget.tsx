@@ -88,6 +88,23 @@ const numInput: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
+// Phone-width check — the FX widget is tall, so on mobile it collapses to a
+// one-line rate summary you tap to expand.
+function useIsMobile(): boolean {
+  const [m, setM] = useState<boolean>(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 640px)").matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 640px)");
+    const on = () => setM(mql.matches);
+    mql.addEventListener("change", on);
+    return () => mql.removeEventListener("change", on);
+  }, []);
+  return m;
+}
+
 export function FxWidget() {
   const [rates, setRates] = useState<RatesResponse | null>(null);
   const [ratesError, setRatesError] = useState<string | null>(null);
@@ -96,6 +113,8 @@ export function FxWidget() {
   const [dir, setDir] = useState<Dir>("USD_PEN"); // default: ¿cuántos soles son X dólares?
   const [amount, setAmount] = useState<string>("100");
   const [showDetail, setShowDetail] = useState(false);
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
 
   // --- Load rates once (same fetch as ConverterPanel) -----------------------
   useEffect(() => {
@@ -141,6 +160,40 @@ export function FxWidget() {
 
   return (
     <section style={card}>
+      {isMobile && !open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          style={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: tokens.spacing.sm,
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            color: tokens.colors.text,
+            font: "inherit",
+          }}
+        >
+          <span style={{ fontWeight: 500 }}>Tipo de cambio</span>
+          <span
+            style={{
+              fontWeight: 500,
+              color: tokens.colors.accent,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {active
+              ? `${SOURCE_LABELS[source]} · venta ${fmtRate(active.venta)}`
+              : "…"}{" "}
+            ›
+          </span>
+        </button>
+      ) : (
+        <>
       {/* header: title + source toggle */}
       <div
         style={{
@@ -372,6 +425,25 @@ export function FxWidget() {
                 El paralelo es referencial y no constituye oferta.
               </p>
             </div>
+          )}
+        </>
+      )}
+          {isMobile && (
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              style={{
+                marginTop: tokens.spacing.sm,
+                background: "none",
+                border: "none",
+                color: tokens.colors.accent,
+                cursor: "pointer",
+                padding: 0,
+                font: "inherit",
+              }}
+            >
+              ▾ Ocultar
+            </button>
           )}
         </>
       )}

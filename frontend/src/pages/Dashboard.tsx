@@ -102,6 +102,8 @@ export function Dashboard() {
   const [importing, setImporting] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
   const [recategorizing, setRecategorizing] = useState(false);
+  // How many movements the list shows before the "Ver más" button (10 at a time).
+  const [visibleCount, setVisibleCount] = useState(10);
   // Display currency is fixed to soles (S/). We don't offer a global toggle —
   // it only relabelled amounts (S/100 -> "$100") without converting, which was
   // misleading. Each row still shows in its own currency via t.currency.
@@ -729,7 +731,7 @@ export function Dashboard() {
                   marginTop: tokens.spacing.sm,
                 }}
               >
-                {txns.map((t) => {
+                {txns.slice(0, visibleCount).map((t) => {
                   const amount = Number(t.amount);
                   return (
                     <div
@@ -835,7 +837,7 @@ export function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {txns.map((t) => {
+                  {txns.slice(0, visibleCount).map((t) => {
                     const amount = Number(t.amount);
                     return (
                       <tr
@@ -886,6 +888,13 @@ export function Dashboard() {
                   })}
                 </tbody>
               </table>
+            )}
+            {txns.length > visibleCount && (
+              <div style={{ marginTop: 12 }}>
+                <button onClick={() => setVisibleCount((n) => n + 10)}>
+                  Ver más movimientos ({txns.length - visibleCount} restantes)
+                </button>
+              </div>
             )}
           </section>
         </>
