@@ -16,6 +16,7 @@ import { Fragment, useEffect, useState } from "react";
 import { apiGet } from "../lib/api";
 import { formatCurrency, type Currency } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang, type Lang } from "../lib/i18n";
 import { AfpPanel } from "./AfpPanel";
 
 interface AfpSummaryProps {
@@ -30,16 +31,53 @@ interface AfpRecord {
   afp_name: string | null;
 }
 
-// Spanish month labels, locale-free so they never render in English.
-const MESES = [
-  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
-];
-function monthLabel(as_of: string): string {
+// Month labels per language, locale-free so they render consistently.
+const MESES: Record<Lang, string[]> = {
+  es: [
+    "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+    "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+  ],
+  en: [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ],
+};
+function monthLabel(as_of: string, lang: Lang): string {
   const parts = as_of.split("-");
   const idx = Math.max(0, Math.min(11, Number(parts[1]) - 1));
-  return `${MESES[idx]}. ${parts[0]}`;
+  return `${MESES[lang][idx]}. ${parts[0]}`;
 }
+
+const T = {
+  es: {
+    verDetalle: "Ver detalle de AFP",
+    ver: "Ver →",
+    ejemplo: "ejemplo",
+    mes: "Mes",
+    aporte: "Aporte",
+    saldo: "Saldo",
+    variacion: "Variación",
+    saldoAl: "Saldo al",
+    agrega: "Agrega tu AFP — escanea tu estado de cuenta.",
+    loading: "Cargando…",
+    miAfp: "Mi AFP",
+    cerrar: "Cerrar",
+  },
+  en: {
+    verDetalle: "View AFP detail",
+    ver: "View →",
+    ejemplo: "example",
+    mes: "Month",
+    aporte: "Contribution",
+    saldo: "Balance",
+    variacion: "Change",
+    saldoAl: "Balance as of",
+    agrega: "Add your AFP — scan your statement.",
+    loading: "Loading…",
+    miAfp: "My AFP",
+    cerrar: "Close",
+  },
+} as const;
 
 // Example "AFP Integra" monthly aporte + saldo (mirrors the full panel's sample)
 // shown when there are no real records, so the card previews a month-by-month
@@ -54,6 +92,8 @@ const EXAMPLE_MONTHS: { as_of: string; aporte: number; balance: number }[] = [
 ];
 
 export function AfpSummary({ currency }: AfpSummaryProps) {
+  const lang = useLang();
+  const t = T[lang];
   const [latest, setLatest] = useState<AfpRecord | null>(null);
   const [records, setRecords] = useState<AfpRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -132,7 +172,7 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
           color: tokens.colors.text,
           font: "inherit",
         }}
-        aria-label="Ver detalle de AFP"
+        aria-label={t.verDetalle}
       >
         <div
           style={{
@@ -150,7 +190,7 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
               ? " · Integra"
               : ""}
           </span>
-          <span style={{ fontSize: 13, color: tokens.colors.accent }}>Ver →</span>
+          <span style={{ fontSize: 13, color: tokens.colors.accent }}>{t.ver}</span>
         </div>
 
         {loaded ? (
@@ -180,7 +220,7 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
                     padding: "2px 8px",
                   }}
                 >
-                  ejemplo
+                  {t.ejemplo}
                 </span>
               )}
             </div>
@@ -200,19 +240,19 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
                   fontSize: 11,
                 }}
               >
-                <span style={{ color: tokens.colors.textMuted }}>Mes</span>
+                <span style={{ color: tokens.colors.textMuted }}>{t.mes}</span>
                 <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
-                  Aporte
+                  {t.aporte}
                 </span>
                 <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
-                  Saldo
+                  {t.saldo}
                 </span>
                 <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
-                  Variación
+                  {t.variacion}
                 </span>
                 {monthRows.map((r) => (
                   <Fragment key={r.as_of}>
-                    <span style={{ color: tokens.colors.text }}>{monthLabel(r.as_of)}</span>
+                    <span style={{ color: tokens.colors.text }}>{monthLabel(r.as_of, lang)}</span>
                     <span style={{ color: tokens.colors.textMuted, textAlign: "right" }}>
                       {r.aporte != null ? formatCurrency(r.aporte, currency) : "—"}
                     </span>
@@ -244,13 +284,13 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
 
             <div style={{ marginTop: 8, fontSize: 12, color: tokens.colors.textMuted }}>
               {latest
-                ? `Saldo al ${latest.as_of}`
-                : "Agrega tu AFP — escanea tu estado de cuenta."}
+                ? `${t.saldoAl} ${latest.as_of}`
+                : t.agrega}
             </div>
           </>
         ) : (
           <div style={{ marginTop: 4, fontSize: 13, color: tokens.colors.textMuted }}>
-            Cargando…
+            {t.loading}
           </div>
         )}
       </button>
@@ -300,12 +340,12 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
                   color: tokens.colors.text,
                 }}
               >
-                Mi AFP
+                {t.miAfp}
               </h3>
               <button
                 type="button"
                 onClick={handleClose}
-                aria-label="Cerrar"
+                aria-label={t.cerrar}
                 style={{
                   background: "none",
                   border: "none",

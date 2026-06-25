@@ -13,6 +13,67 @@ import { useEffect, useMemo, useState } from "react";
 import { apiGet } from "../lib/api";
 import { formatCurrency } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang, type Lang } from "../lib/i18n";
+
+const T = {
+  es: {
+    vencido: "Vencido",
+    venceHoy: "Vence hoy",
+    enDia: (d: number) => `En ${d} ${d === 1 ? "día" : "días"}`,
+    pagoProximo: "pago próximo",
+    pagosProximos: "pagos próximos",
+    tienes: "Tienes",
+    vencidoLower: "vencido",
+    hoy: "hoy",
+    enDiasLower: (d: number) => `en ${d} ${d === 1 ? "día" : "días"}`,
+    nombrePh: "Nombre (Luz, Internet, Alquiler…)",
+    montoPh: "Monto (opcional)",
+    diaPh: "Día",
+    diaAria: "Día de pago (1-31)",
+    repiteCadaMes: "Se repite cada mes",
+    agregar: "Agregar",
+    sinPagos:
+      "Aún no tienes pagos próximos. Agrega un recordatorio (luz, internet, alquiler…).",
+    auto: "auto",
+    manual: "manual",
+    eliminar: (n: string) => `Eliminar ${n}`,
+    eliminarTitle: "Eliminar",
+    avisarme: "Avisarme en el navegador",
+    noDisponible: " (no disponible en este navegador)",
+    // notificación del navegador
+    notifTitle: "Próximos pagos",
+    notifManana: "mañana",
+    notifBody: (resumen: string) => `Tienes pagos por vencer: ${resumen}`,
+  },
+  en: {
+    vencido: "Overdue",
+    venceHoy: "Due today",
+    enDia: (d: number) => `In ${d} ${d === 1 ? "day" : "days"}`,
+    pagoProximo: "upcoming payment",
+    pagosProximos: "upcoming payments",
+    tienes: "You have",
+    vencidoLower: "overdue",
+    hoy: "today",
+    enDiasLower: (d: number) => `in ${d} ${d === 1 ? "day" : "days"}`,
+    nombrePh: "Name (Power, Internet, Rent…)",
+    montoPh: "Amount (optional)",
+    diaPh: "Day",
+    diaAria: "Payment day (1-31)",
+    repiteCadaMes: "Repeats monthly",
+    agregar: "Add",
+    sinPagos:
+      "No upcoming payments yet. Add a reminder (power, internet, rent…).",
+    auto: "auto",
+    manual: "manual",
+    eliminar: (n: string) => `Delete ${n}`,
+    eliminarTitle: "Delete",
+    avisarme: "Notify me in the browser",
+    noDisponible: " (not available in this browser)",
+    notifTitle: "Upcoming payments",
+    notifManana: "tomorrow",
+    notifBody: (resumen: string) => `You have payments due soon: ${resumen}`,
+  },
+} as const;
 
 // --- Tono ámbar para "vence pronto" (no existe en tokens; constante local). ---
 const WARNING = "#EF9F27";
@@ -123,19 +184,28 @@ function saveReminders(list: Recordatorio[]): void {
 }
 
 // --- Texto/colores del badge de urgencia. ----------------------------------
-function urgency(item: UpcomingItem): { label: string; color: string } {
+function urgency(
+  item: UpcomingItem,
+  t: (typeof T)[Lang],
+  lang: Lang,
+): { label: string; color: string } {
   const d = item.diasRestantes;
-  if (d < 0) return { label: "Vencido", color: tokens.colors.down };
-  if (d === 0) return { label: "Vence hoy", color: tokens.colors.down };
-  if (d <= 5) return { label: `En ${d} ${d === 1 ? "día" : "días"}`, color: WARNING };
-  // Más adelante: fecha formateada en es-PE, tono neutro.
+  if (d < 0) return { label: t.vencido, color: tokens.colors.down };
+  if (d === 0) return { label: t.venceHoy, color: tokens.colors.down };
+  if (d <= 5) return { label: t.enDia(d), color: WARNING };
+  // Más adelante: fecha formateada según el idioma, tono neutro.
   return {
-    label: item.due.toLocaleDateString("es-PE", { day: "numeric", month: "short" }),
+    label: item.due.toLocaleDateString(lang === "en" ? "en-US" : "es-PE", {
+      day: "numeric",
+      month: "short",
+    }),
     color: tokens.colors.textMuted,
   };
 }
 
 export function UpcomingPayments() {
+  const lang = useLang();
+  const t = T[lang];
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>(() =>
     loadReminders(),
   );
@@ -211,10 +281,10 @@ export function UpcomingPayments() {
       const inminentes = items.filter((i) => i.diasRestantes <= 1);
       if (inminentes.length === 0) return;
       const resumen = inminentes
-        .map((i) => `${i.nombre} (${i.diasRestantes <= 0 ? "hoy" : "mañana"})`)
+        .map((i) => `${i.nombre} (${i.diasRestantes <= 0 ? t.hoy : t.notifManana})`)
         .join(", ");
-      new Notification("Próximos pagos", {
-        body: `Tienes pagos por vencer: ${resumen}`,
+      new Notification(t.notifTitle, {
+        body: t.notifBody(resumen),
       });
     } catch {
       // Notification puede fallar en algunos navegadores; lo ignoramos.
@@ -298,16 +368,16 @@ export function UpcomingPayments() {
         >
           <span aria-hidden>⚠️</span>
           <span>
-            Tienes {proximos.length}{" "}
-            {proximos.length === 1 ? "pago próximo" : "pagos próximos"}:{" "}
+            {t.tienes} {proximos.length}{" "}
+            {proximos.length === 1 ? t.pagoProximo : t.pagosProximos}:{" "}
             {proximos
               .map((i) => {
                 const cuando =
                   i.diasRestantes < 0
-                    ? "vencido"
+                    ? t.vencidoLower
                     : i.diasRestantes === 0
-                      ? "hoy"
-                      : `en ${i.diasRestantes} ${i.diasRestantes === 1 ? "día" : "días"}`;
+                      ? t.hoy
+                      : t.enDiasLower(i.diasRestantes);
                 const monto =
                   i.monto != null ? ` (${formatCurrency(i.monto, "PEN")}, ${cuando})` : ` (${cuando})`;
                 return `${i.nombre}${monto}`;
@@ -334,7 +404,7 @@ export function UpcomingPayments() {
         <input
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
-          placeholder="Nombre (Luz, Internet, Alquiler…)"
+          placeholder={t.nombrePh}
           style={{
             flex: "2 1 160px",
             padding: "8px 10px",
@@ -348,7 +418,7 @@ export function UpcomingPayments() {
         <input
           value={monto}
           onChange={(e) => setMonto(e.target.value)}
-          placeholder="Monto (opcional)"
+          placeholder={t.montoPh}
           inputMode="decimal"
           type="number"
           min="0"
@@ -366,11 +436,11 @@ export function UpcomingPayments() {
         <input
           value={dia}
           onChange={(e) => setDia(e.target.value)}
-          placeholder="Día"
+          placeholder={t.diaPh}
           type="number"
           min="1"
           max="31"
-          aria-label="Día de pago (1-31)"
+          aria-label={t.diaAria}
           style={{
             flex: "0 1 80px",
             padding: "8px 10px",
@@ -397,7 +467,7 @@ export function UpcomingPayments() {
             checked={recurrente}
             onChange={(e) => setRecurrente(e.target.checked)}
           />
-          Se repite cada mes
+          {t.repiteCadaMes}
         </label>
         <button
           type="submit"
@@ -413,20 +483,19 @@ export function UpcomingPayments() {
             cursor: "pointer",
           }}
         >
-          Agregar
+          {t.agregar}
         </button>
       </form>
 
       {/* Lista unificada ordenada por vencimiento. */}
       {items.length === 0 ? (
         <p style={{ color: tokens.colors.textMuted, margin: "8px 0" }}>
-          Aún no tienes pagos próximos. Agrega un recordatorio (luz, internet,
-          alquiler…).
+          {t.sinPagos}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {items.map((item) => {
-            const u = urgency(item);
+            const u = urgency(item, t, lang);
             return (
               <div
                 key={item.key}
@@ -462,7 +531,7 @@ export function UpcomingPayments() {
                         padding: "1px 8px",
                       }}
                     >
-                      {item.origen === "auto" ? "auto" : "manual"}
+                      {item.origen === "auto" ? t.auto : t.manual}
                     </span>
                   </p>
                   <p
@@ -497,8 +566,8 @@ export function UpcomingPayments() {
                   {item.origen === "manual" && item.recordatorioId && (
                     <button
                       onClick={() => handleDelete(item.recordatorioId!)}
-                      aria-label={`Eliminar ${item.nombre}`}
-                      title="Eliminar"
+                      aria-label={t.eliminar(item.nombre)}
+                      title={t.eliminarTitle}
                       style={{
                         background: "transparent",
                         border: "none",
@@ -537,8 +606,8 @@ export function UpcomingPayments() {
           disabled={!notifSupported}
           onChange={toggleNotif}
         />
-        🔔 Avisarme en el navegador
-        {!notifSupported && " (no disponible en este navegador)"}
+        🔔 {t.avisarme}
+        {!notifSupported && t.noDisponible}
       </label>
     </div>
   );

@@ -24,7 +24,24 @@ def _parse_date(value):
         return None
 
 
-async def weekly_recap(transactions: list[dict]) -> dict:
+_RECAP_SYSTEM = (
+    "Eres un asistente de finanzas peruano. Escribe un resumen MUY breve "
+    "(2-3 frases) en español peruano natural (de 'tú') de la última semana "
+    "de gastos: qué impulsó el gasto, la categoría principal y cualquier "
+    "salto notable. Usa el símbolo 'S/' para los montos. No inventes nada; "
+    "usa solo los datos dados. Responde solo el texto, sin JSON."
+)
+
+_RECAP_SYSTEM_EN = (
+    "You are a Peruvian finance assistant. Write a VERY brief summary "
+    "(2-3 sentences) in natural English of the last week of spending: what drove "
+    "the spending, the main category and any notable jump. Use the symbol 'S/' "
+    "for the amounts. Do not invent anything; use only the data given. Respond "
+    "with the text only, no JSON."
+)
+
+
+async def weekly_recap(transactions: list[dict], lang: str = "es") -> dict:
     dates = [d for d in (_parse_date(t.get("date")) for t in transactions) if d]
     if not dates:
         return dict(_EMPTY)
@@ -69,13 +86,7 @@ async def weekly_recap(transactions: list[dict]) -> dict:
         msg = await client.messages.create(
             model=INSIGHTS_MODEL,
             max_tokens=300,
-            system=(
-                "Eres un asistente de finanzas peruano. Escribe un resumen MUY breve "
-                "(2-3 frases) en español peruano natural (de 'tú') de la última semana "
-                "de gastos: qué impulsó el gasto, la categoría principal y cualquier "
-                "salto notable. Usa el símbolo 'S/' para los montos. No inventes nada; "
-                "usa solo los datos dados. Responde solo el texto, sin JSON."
-            ),
+            system=_RECAP_SYSTEM_EN if lang == "en" else _RECAP_SYSTEM,
             messages=[
                 {
                     "role": "user",

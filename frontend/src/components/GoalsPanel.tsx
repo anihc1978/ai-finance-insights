@@ -9,6 +9,38 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { formatCurrency, type Currency } from "../lib/format";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    title: "Metas de ahorro",
+    namePlaceholder: "Nombre de la meta",
+    targetPlaceholder: "Objetivo",
+    saving: "Guardando…",
+    addGoal: "Agregar meta",
+    empty: "Aún no hay metas — agrega una arriba.",
+    targetDate: "Fecha objetivo: ",
+    addSavings: "Agregar ahorro",
+    del: "Eliminar",
+    errInput: "Ingresa un nombre y un objetivo positivo.",
+    errSavings: "Ingresa un monto positivo para agregar.",
+    promptAdd: (name: string) => `Agregar al ahorro de "${name}":`,
+  },
+  en: {
+    title: "Savings goals",
+    namePlaceholder: "Goal name",
+    targetPlaceholder: "Target",
+    saving: "Saving…",
+    addGoal: "Add goal",
+    empty: "No goals yet — add one above.",
+    targetDate: "Target date: ",
+    addSavings: "Add savings",
+    del: "Delete",
+    errInput: "Enter a name and a positive target.",
+    errSavings: "Enter a positive amount to add.",
+    promptAdd: (name: string) => `Add to savings for "${name}":`,
+  },
+} as const;
 
 interface GoalsPanelProps {
   currency: Currency;
@@ -64,6 +96,8 @@ async function apiDelete<TResponse>(path: string): Promise<TResponse> {
 }
 
 export function GoalsPanel({ currency }: GoalsPanelProps) {
+  const lang = useLang();
+  const t = T[lang];
   const [goals, setGoals] = useState<Goal[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,7 +119,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
   async function handleAdd() {
     const target_amount = Number(target);
     if (!name.trim() || !Number.isFinite(target_amount) || target_amount <= 0) {
-      setError("Ingresa un nombre y un objetivo positivo.");
+      setError(t.errInput);
       return;
     }
     setBusy(true);
@@ -112,11 +146,11 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
 
   // Add a contribution to a goal's saved_amount (PATCH the running total).
   async function handleAddSavings(g: Goal) {
-    const input = window.prompt(`Agregar al ahorro de "${g.name}":`, "");
+    const input = window.prompt(t.promptAdd(g.name), "");
     if (input === null) return;
     const delta = Number(input);
     if (!Number.isFinite(delta) || delta <= 0) {
-      setError("Ingresa un monto positivo para agregar.");
+      setError(t.errSavings);
       return;
     }
     setBusy(true);
@@ -148,20 +182,20 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
 
   return (
     <section style={cardStyle}>
-      <h3 style={{ marginTop: 0 }}>Metas de ahorro</h3>
+      <h3 style={{ marginTop: 0 }}>{t.title}</h3>
 
       {/* Add a goal */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre de la meta"
+          placeholder={t.namePlaceholder}
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
         />
         <input
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          placeholder="Objetivo"
+          placeholder={t.targetPlaceholder}
           type="number"
           min="0"
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6, width: 130 }}
@@ -173,7 +207,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
         />
         <button onClick={handleAdd} disabled={busy}>
-          {busy ? "Guardando…" : "Agregar meta"}
+          {busy ? t.saving : t.addGoal}
         </button>
       </div>
 
@@ -181,7 +215,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
 
       {goals.length === 0 ? (
         <p style={{ color: "#666", marginTop: 12 }}>
-          Aún no hay metas — agrega una arriba.
+          {t.empty}
         </p>
       ) : (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -217,7 +251,7 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
                 </div>
                 {g.target_date && (
                   <p style={{ margin: "4px 0 0", fontSize: 12, color: "#666" }}>
-                    Fecha objetivo: {g.target_date}
+                    {t.targetDate}{g.target_date}
                   </p>
                 )}
                 <div style={{ marginTop: 6, display: "flex", gap: 12 }}>
@@ -226,14 +260,14 @@ export function GoalsPanel({ currency }: GoalsPanelProps) {
                     disabled={busy}
                     style={{ fontSize: 12, padding: "2px 8px" }}
                   >
-                    Agregar ahorro
+                    {t.addSavings}
                   </button>
                   <button
                     onClick={() => handleDelete(g.id)}
                     disabled={busy}
                     style={{ fontSize: 12, padding: "2px 8px", color: "crimson" }}
                   >
-                    Eliminar
+                    {t.del}
                   </button>
                 </div>
               </div>

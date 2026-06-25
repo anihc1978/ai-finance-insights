@@ -7,6 +7,24 @@ import { useEffect, useState } from "react";
 import { apiGet } from "../lib/api";
 import { formatCurrency, categoryLabel } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    loading: "Cargando…",
+    empty:
+      "No detectamos suscripciones recurrentes todavía. Importa o agrega más movimientos.",
+    monthlyTotal: "Pagas al mes en suscripciones",
+    nextCharge: "próximo cargo ~",
+  },
+  en: {
+    loading: "Loading…",
+    empty:
+      "No recurring subscriptions detected yet. Import or add more transactions.",
+    monthlyTotal: "You pay monthly in subscriptions",
+    nextCharge: "next charge ~",
+  },
+} as const;
 
 interface Subscription {
   name: string;
@@ -22,6 +40,8 @@ interface SubsResponse {
 }
 
 export function SubscriptionsPanel() {
+  const lang = useLang();
+  const t = T[lang];
   const [data, setData] = useState<SubsResponse | null>(null);
 
   useEffect(() => {
@@ -30,11 +50,11 @@ export function SubscriptionsPanel() {
       .catch(() => setData(null));
   }, []);
 
-  if (!data) return <p style={{ color: tokens.colors.textMuted }}>Cargando…</p>;
+  if (!data) return <p style={{ color: tokens.colors.textMuted }}>{t.loading}</p>;
   if (data.subscriptions.length === 0)
     return (
       <p style={{ color: tokens.colors.textMuted }}>
-        No detectamos suscripciones recurrentes todavía. Importa o agrega más movimientos.
+        {t.empty}
       </p>
     );
 
@@ -49,7 +69,7 @@ export function SubscriptionsPanel() {
         }}
       >
         <p style={{ margin: 0, fontSize: 13, color: tokens.colors.textMuted }}>
-          Pagas al mes en suscripciones
+          {t.monthlyTotal}
         </p>
         <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 500 }}>
           {formatCurrency(data.monthly_total, "PEN")}
@@ -74,7 +94,7 @@ export function SubscriptionsPanel() {
             <div>
               <p style={{ margin: 0, fontWeight: 500 }}>{s.name}</p>
               <p style={{ margin: 0, fontSize: 12, color: tokens.colors.textMuted }}>
-                {categoryLabel(s.category)} · próximo cargo ~{s.next_estimated}
+                {categoryLabel(s.category, lang)} · {t.nextCharge}{s.next_estimated}
               </p>
             </div>
             <span style={{ fontWeight: 500, whiteSpace: "nowrap" }}>

@@ -5,8 +5,36 @@
 // ---------------------------------------------------------------------------
 import { useState, type FormEvent } from "react";
 import { supabase } from "../lib/supabase";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    subtitleLogin: "Inicia sesión para continuar",
+    subtitleSignup: "Crea una cuenta",
+    password: "Contraseña",
+    submitLogin: "Iniciar sesión",
+    submitSignup: "Registrarse",
+    toSignup: "¿No tienes cuenta? Regístrate",
+    toLogin: "¿Ya tienes cuenta? Inicia sesión",
+    betaPre: "Versión beta. Al continuar aceptas nuestro ",
+    betaLink: "aviso de privacidad",
+  },
+  en: {
+    subtitleLogin: "Sign in to continue",
+    subtitleSignup: "Create an account",
+    password: "Password",
+    submitLogin: "Sign in",
+    submitSignup: "Sign up",
+    toSignup: "Don't have an account? Sign up",
+    toLogin: "Already have an account? Sign in",
+    betaPre: "Beta version. By continuing you accept our ",
+    betaLink: "privacy notice",
+  },
+} as const;
 
 export function Login() {
+  const lang = useLang();
+  const t = T[lang];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -35,7 +63,7 @@ export function Login() {
     <div style={{ maxWidth: 360, margin: "80px auto", fontFamily: "system-ui" }}>
       <h1>AI Finance Insights</h1>
       <p style={{ color: "#666" }}>
-        {mode === "login" ? "Inicia sesión para continuar" : "Crea una cuenta"}
+        {mode === "login" ? t.subtitleLogin : t.subtitleSignup}
       </p>
 
       <form onSubmit={handleSubmit}>
@@ -49,14 +77,14 @@ export function Login() {
         />
         <input
           type="password"
-          placeholder="Contraseña"
+          placeholder={t.password}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
           style={inputStyle}
         />
         <button type="submit" disabled={busy} style={buttonStyle}>
-          {busy ? "…" : mode === "login" ? "Iniciar sesión" : "Registrarse"}
+          {busy ? "…" : mode === "login" ? t.submitLogin : t.submitSignup}
         </button>
       </form>
 
@@ -66,13 +94,13 @@ export function Login() {
         onClick={() => setMode(mode === "login" ? "signup" : "login")}
         style={{ background: "none", border: "none", color: "#2e5c8a", cursor: "pointer" }}
       >
-        {mode === "login" ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia sesión"}
+        {mode === "login" ? t.toSignup : t.toLogin}
       </button>
 
       <p style={{ color: "#888", fontSize: 13, marginTop: 24 }}>
-        Versión beta. Al continuar aceptas nuestro{" "}
+        {t.betaPre}
         <a href="/privacidad.html" target="_blank" rel="noopener noreferrer" style={{ color: "#2e5c8a" }}>
-          aviso de privacidad
+          {t.betaLink}
         </a>
         .
       </p>

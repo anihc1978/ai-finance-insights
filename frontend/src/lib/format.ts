@@ -36,9 +36,12 @@ export function formatCurrency(n: number, currency: Currency = "USD"): string {
   return FORMATTERS[currency].format(n);
 }
 
+import type { Lang } from "./i18n";
+
 /**
- * Spanish display label for a backend category key. The keys stay English in the
- * DB and logic (categorizer, budgets, charts); this only changes what's shown.
+ * Display label for a backend category key, per language. The keys stay English
+ * in the DB and logic (categorizer, budgets, charts); this only changes what's
+ * shown. Spanish output is unchanged from before; English adds a parallel map.
  */
 const CATEGORY_LABELS_ES: Record<string, string> = {
   Groceries: "Alimentos",
@@ -56,16 +59,40 @@ const CATEGORY_LABELS_ES: Record<string, string> = {
   Other: "Otros",
 };
 
-export function categoryLabel(key: string | null | undefined): string {
-  if (!key) return "Sin categoría";
-  return CATEGORY_LABELS_ES[key] ?? key;
+const CATEGORY_LABELS_EN: Record<string, string> = {
+  Groceries: "Groceries",
+  Dining: "Dining",
+  Transport: "Transport",
+  Utilities: "Utilities",
+  Housing: "Housing",
+  Shopping: "Shopping",
+  Entertainment: "Entertainment",
+  Health: "Health",
+  Travel: "Travel",
+  Subscriptions: "Subscriptions",
+  Income: "Income",
+  Transfers: "Transfers",
+  Other: "Other",
+};
+
+/**
+ * Map a category key to its display label in the given language. `lang` defaults
+ * to "es" so existing single-arg calls keep the exact Spanish output as today.
+ */
+export function categoryLabel(
+  key: string | null | undefined,
+  lang: Lang = "es",
+): string {
+  if (!key) return lang === "en" ? "Uncategorized" : "Sin categoría";
+  const map = lang === "en" ? CATEGORY_LABELS_EN : CATEGORY_LABELS_ES;
+  return map[key] ?? key;
 }
 
 /** Turn a "YYYY-MM" period into a friendly label, e.g. "2026-06" -> "jun 2026". */
-export function formatMonthLabel(month: string): string {
+export function formatMonthLabel(month: string, lang: Lang = "es"): string {
   const [year, m] = month.split("-").map(Number);
   if (!year || !m) return month; // fall back to the raw string if it's malformed
-  return new Date(year, m - 1, 1).toLocaleDateString("es-PE", {
+  return new Date(year, m - 1, 1).toLocaleDateString(lang === "en" ? "en-US" : "es-PE", {
     month: "short",
     year: "numeric",
   });

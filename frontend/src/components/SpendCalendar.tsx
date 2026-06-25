@@ -11,6 +11,54 @@
 import { useEffect, useState } from "react";
 import { tokens } from "../lib/theme";
 import { formatCurrency } from "../lib/format";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    weekdays: ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
+    months: [
+      "enero",
+      "febrero",
+      "marzo",
+      "abril",
+      "mayo",
+      "junio",
+      "julio",
+      "agosto",
+      "septiembre",
+      "octubre",
+      "noviembre",
+      "diciembre",
+    ],
+    calendar: "Calendario",
+    prevMonth: "Mes anterior",
+    nextMonth: "Mes siguiente",
+    hideCalendar: "Ocultar calendario",
+    noSpending: "sin gasto",
+  },
+  en: {
+    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    months: [
+      "january",
+      "february",
+      "march",
+      "april",
+      "may",
+      "june",
+      "july",
+      "august",
+      "september",
+      "october",
+      "november",
+      "december",
+    ],
+    calendar: "Calendar",
+    prevMonth: "Previous month",
+    nextMonth: "Next month",
+    hideCalendar: "Hide calendar",
+    noSpending: "no spending",
+  },
+} as const;
 
 // True on phone-width screens. Day cells are only ~40px wide on a phone, far too
 // narrow for a "S/ 1,200.00" label, so on mobile we drop the per-cell amount and
@@ -33,24 +81,6 @@ function useIsMobile(): boolean {
 interface SpendCalendarProps {
   transactions: { date: string; amount: number; currency: string }[];
 }
-
-// Spanish weekday headers, Monday-first (matches the WA/Peru week layout).
-const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-
-const MONTH_NAMES = [
-  "enero",
-  "febrero",
-  "marzo",
-  "abril",
-  "mayo",
-  "junio",
-  "julio",
-  "agosto",
-  "septiembre",
-  "octubre",
-  "noviembre",
-  "diciembre",
-];
 
 // JS getDay(): 0=Sun..6=Sat. We want Monday-first (0=Mon..6=Sun) so the grid
 // lines up under the Lun..Dom headers.
@@ -80,6 +110,7 @@ function initialViewMonth(
 }
 
 export function SpendCalendar({ transactions }: SpendCalendarProps) {
+  const t = T[useLang()];
   const [viewMonth, setViewMonth] = useState<string>(() =>
     initialViewMonth(transactions)
   );
@@ -200,7 +231,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
           }}
         >
           <span style={{ fontWeight: 500, textTransform: "capitalize" }}>
-            Calendario · {MONTH_NAMES[month]} {year}
+            {t.calendar} · {t.months[month]} {year}
           </span>
           <span
             style={{
@@ -226,8 +257,8 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
               <button
                 type="button"
                 onClick={() => shiftMonth(-1)}
-                title="Mes anterior"
-                aria-label="Mes anterior"
+                title={t.prevMonth}
+                aria-label={t.prevMonth}
                 style={chevronStyle}
               >
                 ‹
@@ -243,13 +274,13 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
                   textTransform: "capitalize",
                 }}
               >
-                {MONTH_NAMES[month]} {year}
+                {t.months[month]} {year}
               </h3>
               <button
                 type="button"
                 onClick={() => shiftMonth(1)}
-                title="Mes siguiente"
-                aria-label="Mes siguiente"
+                title={t.nextMonth}
+                aria-label={t.nextMonth}
                 style={chevronStyle}
               >
                 ›
@@ -263,8 +294,8 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  title="Ocultar calendario"
-                  aria-label="Ocultar calendario"
+                  title={t.hideCalendar}
+                  aria-label={t.hideCalendar}
                   style={chevronStyle}
                 >
                   ▾
@@ -282,7 +313,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
               marginBottom: 6,
             }}
           >
-            {WEEKDAYS.map((w) => (
+            {t.weekdays.map((w) => (
               <div
                 key={w}
                 style={{
@@ -318,7 +349,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
                   title={
                     hasSpend
                       ? `${cell.day}: ${formatCurrency(cell.spend, "PEN")}`
-                      : `${cell.day}: sin gasto`
+                      : `${cell.day}: ${t.noSpending}`
                   }
                   style={{
                     minHeight: 56,
@@ -360,12 +391,12 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
               <strong
                 style={{ color: tokens.colors.text, textTransform: "capitalize" }}
               >
-                {selectedDay} {MONTH_NAMES[month]}
+                {selectedDay} {t.months[month]}
               </strong>
               {": "}
               {spendByDay[selectedDay]
                 ? formatCurrency(spendByDay[selectedDay], "PEN")
-                : "sin gasto"}
+                : t.noSpending}
             </div>
           )}
         </>

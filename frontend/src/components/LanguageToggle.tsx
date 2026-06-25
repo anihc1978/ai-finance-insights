@@ -1,40 +1,27 @@
-// src/components/ThemeToggle.tsx
+// src/components/LanguageToggle.tsx
 // ---------------------------------------------------------------------------
-// A compact, premium segmented control for switching the app between the light
-// ("Claro") and dark ("Oscuro") themes. It reads the current theme from
-// theme.ts, calls applyTheme on click (which flips the [data-theme] attribute
-// and persists the choice to localStorage), and re-renders so the active side
-// stays highlighted. It themes itself from `tokens`, so it recolors along with
-// the rest of the dashboard. Self-contained, Spanish labels.
+// A compact, premium segmented control for switching the app between Spanish
+// ("ES") and English ("EN"). It mirrors ThemeToggle's look exactly. It reads
+// the current language from i18n.ts via the useLang() hook, calls setLang on
+// click (which persists the choice and broadcasts a "fin_lang_change" event so
+// every component re-renders), and themes itself from `tokens` so it recolors
+// along with the rest of the dashboard. Self-contained.
 // ---------------------------------------------------------------------------
-import { useState } from "react";
 import { tokens } from "../lib/theme";
-import { applyTheme, getCurrentTheme, type ThemeName } from "../lib/theme";
-import { useLang } from "../lib/i18n";
+import { setLang, useLang, type Lang } from "../lib/i18n";
 
-const T = {
-  es: { aria: "Tema", light: "☀️ Claro", dark: "🌙 Oscuro" },
-  en: { aria: "Theme", light: "☀️ Light", dark: "🌙 Dark" },
-} as const;
+const OPTIONS: { name: Lang; label: string }[] = [
+  { name: "es", label: "ES" },
+  { name: "en", label: "EN" },
+];
 
-export function ThemeToggle() {
+export function LanguageToggle() {
   const lang = useLang();
-  const t = T[lang];
-  const OPTIONS: { name: ThemeName; label: string }[] = [
-    { name: "light", label: t.light },
-    { name: "dark", label: t.dark },
-  ];
-  const [theme, setTheme] = useState<ThemeName>(getCurrentTheme);
-
-  function pick(name: ThemeName) {
-    applyTheme(name);
-    setTheme(name);
-  }
 
   return (
     <div
       role="group"
-      aria-label={t.aria}
+      aria-label="Idioma / Language"
       style={{
         display: "inline-flex",
         padding: 3,
@@ -45,12 +32,12 @@ export function ThemeToggle() {
       }}
     >
       {OPTIONS.map((opt) => {
-        const active = theme === opt.name;
+        const active = lang === opt.name;
         return (
           <button
             key={opt.name}
             type="button"
-            onClick={() => pick(opt.name)}
+            onClick={() => setLang(opt.name)}
             aria-pressed={active}
             style={{
               fontSize: 13,

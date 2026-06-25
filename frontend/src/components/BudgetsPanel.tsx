@@ -12,6 +12,40 @@ import { apiGet, apiPost } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 import { BudgetGauge } from "./BudgetGauge";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    title: "Presupuestos",
+    categoryPlaceholder: "Categoría",
+    limitPlaceholder: "Límite mensual",
+    saving: "Guardando…",
+    setLimit: "Fijar límite",
+    thinking: "Pensando…",
+    suggestAi: "Sugerir con IA",
+    edit: "Editar",
+    del: "Eliminar",
+    empty: "Aún no hay presupuestos — fija un límite por categoría arriba.",
+    errInput: "Ingresa una categoría y un límite positivo.",
+    errNoSuggestions:
+      "Aún no hay sugerencias — importa algunos movimientos primero.",
+  },
+  en: {
+    title: "Budgets",
+    categoryPlaceholder: "Category",
+    limitPlaceholder: "Monthly limit",
+    saving: "Saving…",
+    setLimit: "Set limit",
+    thinking: "Thinking…",
+    suggestAi: "Suggest with AI",
+    edit: "Edit",
+    del: "Delete",
+    empty: "No budgets yet — set a limit per category above.",
+    errInput: "Enter a category and a positive limit.",
+    errNoSuggestions:
+      "No suggestions yet — import some transactions first.",
+  },
+} as const;
 
 interface BudgetsPanelProps {
   currency: Currency;
@@ -72,6 +106,8 @@ async function apiDelete<TResponse>(path: string): Promise<TResponse> {
 }
 
 export function BudgetsPanel({ currency }: BudgetsPanelProps) {
+  const lang = useLang();
+  const t = T[lang];
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,7 +130,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
   async function handleSave() {
     const monthly_limit = Number(limit);
     if (!category.trim() || !Number.isFinite(monthly_limit) || monthly_limit <= 0) {
-      setError("Ingresa una categoría y un límite positivo.");
+      setError(t.errInput);
       return;
     }
     setBusy(true);
@@ -148,7 +184,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
         setCategory(first.category);
         setLimit(String(first.suggested_limit));
       } else {
-        setError("Aún no hay sugerencias — importa algunos movimientos primero.");
+        setError(t.errNoSuggestions);
       }
     } catch (e: unknown) {
       setError(String(e));
@@ -163,7 +199,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
 
   return (
     <section style={cardStyle}>
-      <h3 style={{ marginTop: 0 }}>Presupuestos</h3>
+      <h3 style={{ marginTop: 0 }}>{t.title}</h3>
 
       {/* Overall usage: total spent vs total limit across all categories */}
       {totalLimit > 0 && (
@@ -177,22 +213,22 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
         <input
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="Categoría"
+          placeholder={t.categoryPlaceholder}
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6 }}
         />
         <input
           value={limit}
           onChange={(e) => setLimit(e.target.value)}
-          placeholder="Límite mensual"
+          placeholder={t.limitPlaceholder}
           type="number"
           min="0"
           style={{ padding: 8, border: "1px solid #ddd", borderRadius: 6, width: 130 }}
         />
         <button onClick={handleSave} disabled={busy}>
-          {busy ? "Guardando…" : "Fijar límite"}
+          {busy ? t.saving : t.setLimit}
         </button>
         <button onClick={handleSuggest} disabled={suggesting}>
-          {suggesting ? "Pensando…" : "Sugerir con IA"}
+          {suggesting ? t.thinking : t.suggestAi}
         </button>
       </div>
 
@@ -200,7 +236,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
 
       {budgets.length === 0 ? (
         <p style={{ color: "#666", marginTop: 12 }}>
-          Aún no hay presupuestos — fija un límite por categoría arriba.
+          {t.empty}
         </p>
       ) : (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -212,7 +248,7 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
             return (
               <div key={b.category}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <strong>{categoryLabel(b.category)}</strong>
+                  <strong>{categoryLabel(b.category, lang)}</strong>
                   <span style={{ color: over ? "crimson" : "#333" }}>
                     {formatCurrency(b.spent, currency)} / {formatCurrency(b.monthly_limit, currency)}
                   </span>
@@ -239,14 +275,14 @@ export function BudgetsPanel({ currency }: BudgetsPanelProps) {
                     onClick={() => startEdit(b)}
                     style={{ fontSize: 12, padding: "2px 8px" }}
                   >
-                    Editar
+                    {t.edit}
                   </button>
                   <button
                     onClick={() => handleDelete(b.category)}
                     disabled={busy}
                     style={{ fontSize: 12, padding: "2px 8px", color: "crimson" }}
                   >
-                    Eliminar
+                    {t.del}
                   </button>
                 </div>
               </div>

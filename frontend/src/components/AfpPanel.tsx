@@ -21,10 +21,98 @@ import {
 import { apiGet, apiPost, apiDelete, apiUpload } from "../lib/api";
 import { formatCurrency, type Currency } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang, type Lang } from "../lib/i18n";
 
 interface AfpPanelProps {
   currency: Currency;
 }
+
+const T = {
+  es: {
+    saldoActual: "Saldo actual",
+    fondo: "Fondo",
+    al: "al",
+    afpIntegra: "AFP Integra",
+    ejemploMuestra: "Ejemplo — datos de muestra",
+    asiSeVera:
+      "Así se verá tu AFP. Escanea o ingresa tu estado de cuenta abajo para reemplazarlo con tus números reales.",
+    mes: "Mes",
+    aporte: "Aporte",
+    saldo: "Saldo",
+    variacion: "Variación",
+    saldoEnTiempo: "Saldo en el tiempo",
+    agregaDos: "Agrega al menos dos registros para ver la evolución.",
+    escanearEstado: "Escanear estado de cuenta",
+    subeFoto:
+      "Sube una foto de tu estado de cuenta AFP (Integra, Prima, Profuturo o Habitat) y la leeremos por ti.",
+    leyendo: "Leyendo…",
+    elegirImagen: "Elegir imagen",
+    revisarGuardar: "Revisar y guardar",
+    ingresarManual: "Ingresar manualmente",
+    revisaLeido: "Revisa lo que leímos del estado de cuenta antes de guardar.",
+    fechaEstado: "Fecha del estado",
+    saldoSoles: "Saldo (S/)",
+    saldoTotal: "Saldo total",
+    tipoFondo: "Tipo de fondo",
+    fondoPh: "Fondo 0/1/2/3",
+    aporteDelPeriodo: "Aporte del periodo",
+    aportePh: "Aporte",
+    afp: "AFP",
+    afpPh: "Integra, Prima…",
+    guardando: "Guardando…",
+    guardar: "Guardar",
+    cancelar: "Cancelar",
+    errorFechaSaldo: "Ingresa la fecha y un saldo positivo.",
+    errorAporte: "El aporte debe ser un número.",
+    errorPrefix: "Error:",
+    registrosGuardados: "Registros guardados",
+    aunNoRegistros: "Aún no hay registros — escanea o ingresa uno arriba.",
+    aporteLabel: "aporte",
+    eliminar: "Eliminar",
+  },
+  en: {
+    saldoActual: "Current balance",
+    fondo: "Fund",
+    al: "as of",
+    afpIntegra: "AFP Integra",
+    ejemploMuestra: "Example — sample data",
+    asiSeVera:
+      "This is how your AFP will look. Scan or enter your statement below to replace it with your real numbers.",
+    mes: "Month",
+    aporte: "Contribution",
+    saldo: "Balance",
+    variacion: "Change",
+    saldoEnTiempo: "Balance over time",
+    agregaDos: "Add at least two records to see the trend.",
+    escanearEstado: "Scan statement",
+    subeFoto:
+      "Upload a photo of your AFP statement (Integra, Prima, Profuturo or Habitat) and we'll read it for you.",
+    leyendo: "Reading…",
+    elegirImagen: "Choose image",
+    revisarGuardar: "Review and save",
+    ingresarManual: "Enter manually",
+    revisaLeido: "Review what we read from the statement before saving.",
+    fechaEstado: "Statement date",
+    saldoSoles: "Balance (S/)",
+    saldoTotal: "Total balance",
+    tipoFondo: "Fund type",
+    fondoPh: "Fund 0/1/2/3",
+    aporteDelPeriodo: "Period contribution",
+    aportePh: "Contribution",
+    afp: "AFP",
+    afpPh: "Integra, Prima…",
+    guardando: "Saving…",
+    guardar: "Save",
+    cancelar: "Cancel",
+    errorFechaSaldo: "Enter the date and a positive balance.",
+    errorAporte: "The contribution must be a number.",
+    errorPrefix: "Error:",
+    registrosGuardados: "Saved records",
+    aunNoRegistros: "No records yet — scan or enter one above.",
+    aporteLabel: "contribution",
+    eliminar: "Delete",
+  },
+} as const;
 
 // One row from GET /afp.
 interface AfpRecord {
@@ -76,14 +164,17 @@ const EXAMPLE_RECORDS: AfpRecord[] = [
   { id: "ex-6", as_of: "2026-06-30", balance: 15640, fund_type: null, contributed: 430, afp_name: "Integra", source: "example" },
 ];
 
-// "2026-01-31" → "Ene 2026" (Spanish short month, capitalised).
-function monthLabel(asOf: string): string {
+// "2026-01-31" → "Ene 2026" (es) / "Jan 2026" (en), short month, capitalised.
+function monthLabel(asOf: string, lang: Lang): string {
   const [year, m] = asOf.split("-").map(Number);
   if (!year || !m) return asOf;
-  const label = new Date(year, m - 1, 1).toLocaleDateString("es-PE", {
-    month: "short",
-    year: "numeric",
-  });
+  const label = new Date(year, m - 1, 1).toLocaleDateString(
+    lang === "en" ? "en-US" : "es-PE",
+    {
+      month: "short",
+      year: "numeric",
+    },
+  );
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -109,6 +200,8 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function AfpPanel({ currency }: AfpPanelProps) {
+  const lang = useLang();
+  const t = T[lang];
   const [records, setRecords] = useState<AfpRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,12 +255,12 @@ export function AfpPanel({ currency }: AfpPanelProps) {
   async function handleSave() {
     const balance = Number(form.balance);
     if (!form.as_of || !Number.isFinite(balance) || balance <= 0) {
-      setError("Ingresa la fecha y un saldo positivo.");
+      setError(t.errorFechaSaldo);
       return;
     }
     const contributed = form.contributed.trim() === "" ? null : Number(form.contributed);
     if (contributed !== null && !Number.isFinite(contributed)) {
-      setError("El aporte debe ser un número.");
+      setError(t.errorAporte);
       return;
     }
     setBusy(true);
@@ -239,7 +332,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
       {latest && (
         <section style={cardStyle}>
           <p style={{ margin: 0, color: tokens.colors.textMuted, fontSize: 13 }}>
-            Saldo actual {latest.afp_name ? `· ${latest.afp_name}` : ""}
+            {t.saldoActual} {latest.afp_name ? `· ${latest.afp_name}` : ""}
           </p>
           <p
             style={{
@@ -252,7 +345,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
             {formatCurrency(latest.balance, currency)}
           </p>
           <p style={{ margin: "4px 0 0", color: tokens.colors.textMuted, fontSize: 13 }}>
-            {latest.fund_type ? `Fondo: ${latest.fund_type} · ` : ""}al {latest.as_of}
+            {latest.fund_type ? `${t.fondo}: ${latest.fund_type} · ` : ""}{t.al} {latest.as_of}
           </p>
         </section>
       )}
@@ -271,7 +364,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
               flexWrap: "wrap",
             }}
           >
-            <h3 style={sectionTitle}>AFP Integra</h3>
+            <h3 style={sectionTitle}>{t.afpIntegra}</h3>
             <span
               style={{
                 fontSize: 11,
@@ -283,18 +376,17 @@ export function AfpPanel({ currency }: AfpPanelProps) {
                 padding: "2px 8px",
               }}
             >
-              Ejemplo — datos de muestra
+              {t.ejemploMuestra}
             </span>
           </div>
           <p style={{ color: tokens.colors.textMuted, fontSize: 13, marginTop: 4 }}>
-            Así se verá tu AFP. Escanea o ingresa tu estado de cuenta abajo para
-            reemplazarlo con tus números reales.
+            {t.asiSeVera}
           </p>
           <div style={{ overflowX: "auto", marginTop: 12 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr>
-                  {["Mes", "Aporte", "Saldo", "Variación"].map((h, i) => (
+                  {[t.mes, t.aporte, t.saldo, t.variacion].map((h, i) => (
                     <th
                       key={h}
                       style={{
@@ -326,7 +418,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {monthLabel(r.as_of)}
+                        {monthLabel(r.as_of, lang)}
                       </td>
                       <td
                         style={{
@@ -385,7 +477,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
 
       {/* Balance over time. */}
       <section style={cardStyle}>
-        <h3 style={sectionTitle}>Saldo en el tiempo</h3>
+        <h3 style={sectionTitle}>{t.saldoEnTiempo}</h3>
         {chartData.length > 1 ? (
           <div style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -410,17 +502,16 @@ export function AfpPanel({ currency }: AfpPanelProps) {
           </div>
         ) : (
           <p style={{ color: tokens.colors.textMuted }}>
-            Agrega al menos dos registros para ver la evolución.
+            {t.agregaDos}
           </p>
         )}
       </section>
 
       {/* Scan a statement. */}
       <section style={cardStyle}>
-        <h3 style={sectionTitle}>Escanear estado de cuenta</h3>
+        <h3 style={sectionTitle}>{t.escanearEstado}</h3>
         <p style={{ color: tokens.colors.textMuted, fontSize: 13, marginTop: 4 }}>
-          Sube una foto de tu estado de cuenta AFP (Integra, Prima, Profuturo o
-          Habitat) y la leeremos por ti.
+          {t.subeFoto}
         </p>
         <label
           style={{
@@ -433,7 +524,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
             fontSize: 14,
           }}
         >
-          {scanning ? "Leyendo…" : "Elegir imagen"}
+          {scanning ? t.leyendo : t.elegirImagen}
           <input
             type="file"
             accept="image/*"
@@ -451,11 +542,11 @@ export function AfpPanel({ currency }: AfpPanelProps) {
       {/* Review (after scan) or manual entry. Same form. */}
       <section style={cardStyle}>
         <h3 style={sectionTitle}>
-          {fromScan ? "Revisar y guardar" : "Ingresar manualmente"}
+          {fromScan ? t.revisarGuardar : t.ingresarManual}
         </h3>
         {fromScan && (
           <p style={{ color: tokens.colors.textMuted, fontSize: 13, marginTop: 4 }}>
-            Revisa lo que leímos del estado de cuenta antes de guardar.
+            {t.revisaLeido}
           </p>
         )}
         <div
@@ -468,7 +559,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
           }}
         >
           <label style={{ display: "flex", flexDirection: "column", fontSize: 12, color: tokens.colors.textMuted }}>
-            Fecha del estado
+            {t.fechaEstado}
             <input
               value={form.as_of}
               onChange={(e) => setField("as_of", e.target.value)}
@@ -477,66 +568,66 @@ export function AfpPanel({ currency }: AfpPanelProps) {
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", fontSize: 12, color: tokens.colors.textMuted }}>
-            Saldo (S/)
+            {t.saldoSoles}
             <input
               value={form.balance}
               onChange={(e) => setField("balance", e.target.value)}
-              placeholder="Saldo total"
+              placeholder={t.saldoTotal}
               type="number"
               min="0"
               style={{ ...inputStyle, width: 140 }}
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", fontSize: 12, color: tokens.colors.textMuted }}>
-            Tipo de fondo
+            {t.tipoFondo}
             <input
               value={form.fund_type}
               onChange={(e) => setField("fund_type", e.target.value)}
-              placeholder="Fondo 0/1/2/3"
+              placeholder={t.fondoPh}
               style={{ ...inputStyle, width: 130 }}
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", fontSize: 12, color: tokens.colors.textMuted }}>
-            Aporte del periodo
+            {t.aporteDelPeriodo}
             <input
               value={form.contributed}
               onChange={(e) => setField("contributed", e.target.value)}
-              placeholder="Aporte"
+              placeholder={t.aportePh}
               type="number"
               min="0"
               style={{ ...inputStyle, width: 130 }}
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", fontSize: 12, color: tokens.colors.textMuted }}>
-            AFP
+            {t.afp}
             <input
               value={form.afp_name}
               onChange={(e) => setField("afp_name", e.target.value)}
-              placeholder="Integra, Prima…"
+              placeholder={t.afpPh}
               style={{ ...inputStyle, width: 150 }}
             />
           </label>
         </div>
         <div style={{ marginTop: 12, display: "flex", gap: 12 }}>
           <button onClick={handleSave} disabled={busy}>
-            {busy ? "Guardando…" : "Guardar"}
+            {busy ? t.guardando : t.guardar}
           </button>
           {fromScan && (
             <button onClick={handleCancelScan} disabled={busy} style={{ color: tokens.colors.textMuted }}>
-              Cancelar
+              {t.cancelar}
             </button>
           )}
         </div>
       </section>
 
-      {error && <p style={{ color: tokens.colors.down, marginTop: 12 }}>Error: {error}</p>}
+      {error && <p style={{ color: tokens.colors.down, marginTop: 12 }}>{t.errorPrefix} {error}</p>}
 
       {/* Saved records. */}
       <section style={cardStyle}>
-        <h3 style={sectionTitle}>Registros guardados</h3>
+        <h3 style={sectionTitle}>{t.registrosGuardados}</h3>
         {records.length === 0 ? (
           <p style={{ color: tokens.colors.textMuted, marginTop: 8 }}>
-            Aún no hay registros — escanea o ingresa uno arriba.
+            {t.aunNoRegistros}
           </p>
         ) : (
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -559,7 +650,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
                     {r.as_of}
                     {r.fund_type ? ` · ${r.fund_type}` : ""}
                     {r.afp_name ? ` · ${r.afp_name}` : ""}
-                    {r.contributed != null ? ` · aporte ${formatCurrency(r.contributed, currency)}` : ""}
+                    {r.contributed != null ? ` · ${t.aporteLabel} ${formatCurrency(r.contributed, currency)}` : ""}
                   </p>
                 </div>
                 <button
@@ -567,7 +658,7 @@ export function AfpPanel({ currency }: AfpPanelProps) {
                   disabled={busy}
                   style={{ fontSize: 12, padding: "2px 8px", color: tokens.colors.down }}
                 >
-                  Eliminar
+                  {t.eliminar}
                 </button>
               </div>
             ))}

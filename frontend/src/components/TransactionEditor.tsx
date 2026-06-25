@@ -8,6 +8,46 @@ import { useState } from "react";
 import { apiPost, apiPatch } from "../lib/api";
 import { tokens } from "../lib/theme";
 import { categoryLabel } from "../lib/format";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    addTitle: "Agregar movimiento",
+    editTitle: "Editar movimiento",
+    date: "Fecha",
+    description: "Descripción",
+    descPlaceholder: "Ej. Compras en el mercado",
+    amount: "Monto (negativo = gasto)",
+    currency: "Moneda",
+    category: "Categoría",
+    noCategory: "Sin categoría",
+    applySimilar: "Aplicar a movimientos parecidos",
+    cancel: "Cancelar",
+    saving: "Guardando…",
+    save: "Guardar",
+    errDate: "Ingresa una fecha.",
+    errDesc: "Ingresa una descripción.",
+    errAmount: "Ingresa un monto (negativo = gasto).",
+  },
+  en: {
+    addTitle: "Add transaction",
+    editTitle: "Edit transaction",
+    date: "Date",
+    description: "Description",
+    descPlaceholder: "E.g. Groceries at the market",
+    amount: "Amount (negative = expense)",
+    currency: "Currency",
+    category: "Category",
+    noCategory: "Unspecified",
+    applySimilar: "Apply to similar transactions",
+    cancel: "Cancel",
+    saving: "Saving…",
+    save: "Save",
+    errDate: "Enter a date.",
+    errDesc: "Enter a description.",
+    errAmount: "Enter an amount (negative = expense).",
+  },
+} as const;
 
 type TxnCurrency = "PEN" | "USD";
 
@@ -73,6 +113,8 @@ export function TransactionEditor({
   onSaved,
   onClose,
 }: TransactionEditorProps) {
+  const lang = useLang();
+  const t = T[lang];
   const [date, setDate] = useState(initial?.date ?? today());
   const [description, setDescription] = useState(initial?.description ?? "");
   const [amount, setAmount] = useState(
@@ -91,15 +133,15 @@ export function TransactionEditor({
   async function handleSubmit() {
     const numericAmount = Number(amount);
     if (!date) {
-      setError("Ingresa una fecha.");
+      setError(t.errDate);
       return;
     }
     if (!description.trim()) {
-      setError("Ingresa una descripción.");
+      setError(t.errDesc);
       return;
     }
     if (!Number.isFinite(numericAmount) || numericAmount === 0) {
-      setError("Ingresa un monto (negativo = gasto).");
+      setError(t.errAmount);
       return;
     }
     setBusy(true);
@@ -173,13 +215,13 @@ export function TransactionEditor({
             color: tokens.colors.text,
           }}
         >
-          {mode === "add" ? "Agregar movimiento" : "Editar movimiento"}
+          {mode === "add" ? t.addTitle : t.editTitle}
         </h3>
 
         <div style={{ display: "flex", flexDirection: "column", gap: tokens.spacing.md }}>
           <div>
             <label style={labelStyle} htmlFor="txn-date">
-              Fecha
+              {t.date}
             </label>
             <input
               id="txn-date"
@@ -192,14 +234,14 @@ export function TransactionEditor({
 
           <div>
             <label style={labelStyle} htmlFor="txn-desc">
-              Descripción
+              {t.description}
             </label>
             <input
               id="txn-desc"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ej. Compras en el mercado"
+              placeholder={t.descPlaceholder}
               style={inputStyle}
             />
           </div>
@@ -207,7 +249,7 @@ export function TransactionEditor({
           <div style={{ display: "flex", gap: tokens.spacing.md }}>
             <div style={{ flex: 1 }}>
               <label style={labelStyle} htmlFor="txn-amount">
-                Monto (negativo = gasto)
+                {t.amount}
               </label>
               <input
                 id="txn-amount"
@@ -221,7 +263,7 @@ export function TransactionEditor({
             </div>
             <div style={{ width: 120 }}>
               <label style={labelStyle} htmlFor="txn-currency">
-                Moneda
+                {t.currency}
               </label>
               <select
                 id="txn-currency"
@@ -237,7 +279,7 @@ export function TransactionEditor({
 
           <div>
             <label style={labelStyle} htmlFor="txn-category">
-              Categoría
+              {t.category}
             </label>
             <select
               id="txn-category"
@@ -245,10 +287,10 @@ export function TransactionEditor({
               onChange={(e) => setCategory(e.target.value)}
               style={inputStyle}
             >
-              <option value="">Sin categoría</option>
+              <option value="">{t.noCategory}</option>
               {CATEGORY_KEYS.map((key) => (
                 <option key={key} value={key}>
-                  {categoryLabel(key)}
+                  {categoryLabel(key, lang)}
                 </option>
               ))}
             </select>
@@ -271,7 +313,7 @@ export function TransactionEditor({
                   disabled={!category}
                   onChange={(e) => setApplySimilar(e.target.checked)}
                 />
-                Aplicar a movimientos parecidos
+                {t.applySimilar}
               </label>
             )}
           </div>
@@ -292,10 +334,10 @@ export function TransactionEditor({
           }}
         >
           <button onClick={onClose} disabled={busy}>
-            Cancelar
+            {t.cancel}
           </button>
           <button onClick={handleSubmit} disabled={busy}>
-            {busy ? "Guardando…" : "Guardar"}
+            {busy ? t.saving : t.save}
           </button>
         </div>
       </div>

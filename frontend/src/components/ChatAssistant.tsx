@@ -20,6 +20,42 @@ import {
 } from "react";
 import { apiPost } from "../lib/api";
 import { tokens } from "../lib/theme";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    heading: "💬 Pregúntale a la IA",
+    subtitle:
+      "Tu experta en finanzas. Pregúntale lo que quieras sobre tus gastos, ingresos y ahorro.",
+    placeholder: "Escribe tu pregunta sobre tus finanzas…",
+    thinking: "Pensando…",
+    send: "Enviar",
+    error: "Algo salió mal.",
+    aiBadge: "✨ IA",
+    suggestions: [
+      "¿En qué gasté más este mes?",
+      "¿Cuánto puedo ahorrar?",
+      "¿Tengo suscripciones que cancelar?",
+      "¿Me alcanza para un viaje?",
+    ],
+  },
+  en: {
+    heading: "💬 Ask the AI",
+    subtitle:
+      "Your finance expert. Ask anything about your spending, income and savings.",
+    placeholder: "Type your question about your finances…",
+    thinking: "Thinking…",
+    send: "Send",
+    error: "Something went wrong.",
+    aiBadge: "✨ AI",
+    suggestions: [
+      "What did I spend most on this month?",
+      "How much can I save?",
+      "Any subscriptions to cancel?",
+      "Can I afford a trip?",
+    ],
+  },
+} as const;
 
 // One turn in the conversation. Mirrors the {role, content} shape the backend
 // expects for `history` (roles are exactly "user" | "assistant").
@@ -39,14 +75,6 @@ interface ChatResponse {
 }
 
 const { colors, radii, spacing } = tokens;
-
-// Starter questions shown only when the conversation is empty.
-const SUGGESTIONS = [
-  "¿En qué gasté más este mes?",
-  "¿Cuánto puedo ahorrar?",
-  "¿Tengo suscripciones que cancelar?",
-  "¿Me alcanza para un viaje?",
-];
 
 const wrapperStyle: CSSProperties = {
   marginTop: spacing.lg,
@@ -83,6 +111,7 @@ const transcriptStyle: CSSProperties = {
 };
 
 export function ChatAssistant() {
+  const t = T[useLang()];
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -133,7 +162,7 @@ export function ChatAssistant() {
         { role: "assistant", content: data.reply },
       ]);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Algo salió mal.");
+      setError(err instanceof Error ? err.message : t.error);
     } finally {
       setLoading(false);
     }
@@ -154,10 +183,10 @@ export function ChatAssistant() {
       {/* Heading */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: spacing.xs }}>
         <h2 style={headingStyle}>
-          💬 Pregúntale a la IA
+          {t.heading}
         </h2>
         <p style={subtitleStyle}>
-          Tu experta en finanzas. Pregúntale lo que quieras sobre tus gastos, ingresos y ahorro.
+          {t.subtitle}
         </p>
       </div>
 
@@ -203,7 +232,7 @@ export function ChatAssistant() {
               }}
             >
               <Spinner color={colors.textMuted} />
-              Pensando…
+              {t.thinking}
             </div>
           )}
         </div>
@@ -240,7 +269,7 @@ export function ChatAssistant() {
           onKeyDown={onKeyDown}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder="Escribe tu pregunta sobre tus finanzas…"
+          placeholder={t.placeholder}
           rows={1}
           disabled={loading}
           style={{
@@ -282,14 +311,14 @@ export function ChatAssistant() {
               letterSpacing: "0.01em",
             }}
           >
-            ✨ IA
+            {t.aiBadge}
           </span>
 
           <button
             type="button"
             onClick={() => void send(input)}
             disabled={!canSend}
-            aria-label="Enviar"
+            aria-label={t.send}
             style={{
               width: 36,
               height: 36,
@@ -314,7 +343,7 @@ export function ChatAssistant() {
       {/* Suggestion chips (only before any conversation) */}
       {showSuggestions && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: spacing.sm }}>
-          {SUGGESTIONS.map((q) => (
+          {t.suggestions.map((q) => (
             <button
               key={q}
               type="button"

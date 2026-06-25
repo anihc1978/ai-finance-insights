@@ -43,6 +43,17 @@ from app.services.subscriptions import detect_subscriptions
 
 logger = logging.getLogger(__name__)
 
+
+def get_lang(request: Request) -> str:
+    """Read the UI language from the 'X-Lang' header (default 'es').
+
+    The frontend attaches X-Lang: es|en to every request. Only the natural-language
+    AI outputs (chat reply, insights narrative/flags/highlights, weekly recap) switch
+    on it; anything else (category keys, amounts in 'S/') is language-neutral.
+    """
+    lang = (request.headers.get("x-lang") or "es").strip().lower()
+    return lang if lang in ("es", "en") else "es"
+
 # Broad per-caller rate limit applied to EVERY route (keyed by user id, or by
 # client IP when unauthenticated). The stricter AI limit is added per-endpoint
 # below. See app/services/ratelimit.py — in-memory, per-instance.
@@ -407,6 +418,7 @@ def categorize_similar(
 async def get_insights(
     month: str | None = None,
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_lang),
     _ai: None = Depends(ai_rate_limit),
 ):
     """
@@ -435,7 +447,7 @@ async def get_insights(
             detail="No transactions to analyze",
         )
 
-    insight = await build_insight(all_txns, target_month)
+    insight = await build_insight(all_txns, target_month, lang)
 
     # Best-effort cache: persist the narrative + forecast for this (user, period).
     # Wrapped in try/except so a schema mismatch (e.g. a missing column) can never
@@ -478,6 +490,7 @@ def get_subscriptions(user: CurrentUser = Depends(get_current_user)):
 @app.get("/recap/weekly")
 async def get_weekly_recap(
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_lang),
     _ai: None = Depends(ai_rate_limit),
 ):
     """A short AI recap of the latest 7-day window in the user's transactions.
@@ -493,7 +506,7 @@ async def get_weekly_recap(
         .execute()
     ).data or []
 
-    return await weekly_recap(txns)
+    return await weekly_recap(txns, lang)
 
 
 # ---------------------------------------------------------------------------
@@ -595,6 +608,7 @@ def update_profile(body: ProfileBody, user: CurrentUser = Depends(get_current_us
 async def chat(
     body: ChatBody,
     user: CurrentUser = Depends(get_current_user),
+    lang: str = Depends(get_lang),
     _ai: None = Depends(ai_rate_limit),
 ):
     """Conversational money assistant: a Claude tool-use loop over the user's data."""
@@ -603,7 +617,7 @@ async def chat(
     rows = client.table("profiles").select("currency").eq("user_id", user.id).execute().data or []
     currency = rows[0]["currency"] if rows else DEFAULT_CURRENCY
 
-    return await build_chat_reply(client, currency, body.message, body.history)
+    return await build_chat_reply(client, currency, body.message, body.history, lang)
 
 
 @app.get("/budgets")

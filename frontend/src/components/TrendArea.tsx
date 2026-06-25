@@ -14,6 +14,12 @@ import {
 } from "recharts";
 import { formatCurrency, formatMonthLabel, type Currency } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: { title: "Gasto en el tiempo", empty: "Aún no hay suficiente historial." },
+  en: { title: "Spending over time", empty: "Not enough history yet." },
+} as const;
 
 interface MonthSpend {
   month: string; // "YYYY-MM"
@@ -33,13 +39,15 @@ const cardStyle: React.CSSProperties = {
 };
 
 export function TrendArea({ data, currency }: TrendAreaProps) {
+  const lang = useLang();
+  const t = T[lang];
   // Add a human-friendly axis label without mutating the contract data.
-  const chartData = data.map((d) => ({ ...d, label: formatMonthLabel(d.month) }));
+  const chartData = data.map((d) => ({ ...d, label: formatMonthLabel(d.month, lang) }));
 
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 500, color: tokens.colors.text }}>
-        Gasto en el tiempo
+        {t.title}
       </h3>
       {chartData.length > 0 ? (
         <div style={{ width: "100%", height: 280 }}>
@@ -70,7 +78,7 @@ export function TrendArea({ data, currency }: TrendAreaProps) {
           </ResponsiveContainer>
         </div>
       ) : (
-        <p style={{ color: tokens.colors.textMuted }}>Aún no hay suficiente historial.</p>
+        <p style={{ color: tokens.colors.textMuted }}>{t.empty}</p>
       )}
     </section>
   );

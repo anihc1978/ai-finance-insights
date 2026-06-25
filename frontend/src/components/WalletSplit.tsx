@@ -6,6 +6,12 @@
 // ---------------------------------------------------------------------------
 import { formatCurrency, type Currency } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: { wallets: "Tus billeteras", soles: "Soles", dollars: "Dólares" },
+  en: { wallets: "Your wallets", soles: "Soles", dollars: "Dollars" },
+} as const;
 
 interface WalletSplitProps {
   pen: number;
@@ -53,14 +59,15 @@ function Wallet({ label, amount, walletCurrency }: WalletProps) {
 }
 
 export function WalletSplit({ pen, usd }: WalletSplitProps) {
+  const t = T[useLang()];
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 500, color: tokens.colors.text }}>
-        Tus billeteras
+        {t.wallets}
       </h3>
       <div style={{ display: "flex", gap: tokens.spacing.md }}>
-        <Wallet label="Soles" amount={pen} walletCurrency="PEN" />
-        <Wallet label="Dólares" amount={usd} walletCurrency="USD" />
+        <Wallet label={t.soles} amount={pen} walletCurrency="PEN" />
+        <Wallet label={t.dollars} amount={usd} walletCurrency="USD" />
       </div>
     </section>
   );

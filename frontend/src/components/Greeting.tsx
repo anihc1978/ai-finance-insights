@@ -6,15 +6,40 @@
 // ---------------------------------------------------------------------------
 import { useState } from "react";
 import { tokens } from "../lib/theme";
+import { useLang, type Lang } from "../lib/i18n";
 
-function timeGreeting(): string {
+const T = {
+  es: {
+    morning: "Buenos días",
+    afternoon: "Buenas tardes",
+    evening: "Buenas noches",
+    yourName: "Tu nombre",
+    save: "Guardar",
+    edit: "Editar",
+    editName: "Editar nombre",
+  },
+  en: {
+    morning: "Good morning",
+    afternoon: "Good afternoon",
+    evening: "Good evening",
+    yourName: "Your name",
+    save: "Save",
+    edit: "Edit",
+    editName: "Edit name",
+  },
+} as const;
+
+function timeGreeting(lang: Lang): string {
+  const t = T[lang];
   const h = new Date().getHours();
-  if (h < 12) return "Buenos días";
-  if (h < 19) return "Buenas tardes";
-  return "Buenas noches";
+  if (h < 12) return t.morning;
+  if (h < 19) return t.afternoon;
+  return t.evening;
 }
 
 export function Greeting() {
+  const lang = useLang();
+  const t = T[lang];
   const [name, setName] = useState<string>(
     () => localStorage.getItem("fin_nombre") ?? "Eduardo",
   );
@@ -35,25 +60,25 @@ export function Greeting() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && save()}
-          placeholder="Tu nombre"
+          placeholder={t.yourName}
           autoFocus
           style={{ fontSize: 22, padding: "4px 10px" }}
         />
-        <button onClick={save}>Guardar</button>
+        <button onClick={save}>{t.save}</button>
       </div>
     );
   }
 
   return (
     <h1 style={{ margin: 0, fontWeight: 500, display: "flex", alignItems: "baseline", gap: 8 }}>
-      {timeGreeting()}
+      {timeGreeting(lang)}
       {name ? `, ${name}` : ""}
       <button
         onClick={() => {
           setDraft(name);
           setEditing(true);
         }}
-        aria-label="Editar nombre"
+        aria-label={t.editName}
         style={{
           fontSize: 13,
           color: tokens.colors.textMuted,
@@ -63,7 +88,7 @@ export function Greeting() {
           padding: 0,
         }}
       >
-        Editar
+        {t.edit}
       </button>
     </h1>
   );

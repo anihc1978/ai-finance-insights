@@ -5,6 +5,22 @@
 // Premium restyle of the AI-insights panel. Presentational only.
 // ---------------------------------------------------------------------------
 import { tokens } from "../lib/theme";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    title: "Análisis con IA",
+    found: "Esto encontramos",
+    none: "Aún no hay análisis.",
+    alerts: "Alertas",
+  },
+  en: {
+    title: "AI analysis",
+    found: "Here is what we found",
+    none: "No analysis yet.",
+    alerts: "Alerts",
+  },
+} as const;
 
 interface Highlight {
   title: string;
@@ -25,10 +41,12 @@ const cardStyle: React.CSSProperties = {
 };
 
 export function InsightCard({ narrative, flags, highlights }: InsightCardProps) {
+  const lang = useLang();
+  const t = T[lang];
   return (
     <section style={cardStyle}>
       <h3 style={{ marginTop: 0, fontSize: 15, fontWeight: 500, color: tokens.colors.text }}>
-        Análisis con IA
+        {t.title}
       </h3>
 
       {highlights.length > 0 && (
@@ -43,7 +61,7 @@ export function InsightCard({ narrative, flags, highlights }: InsightCardProps) 
               color: tokens.colors.textMuted,
             }}
           >
-            Esto encontramos
+            {t.found}
           </h4>
           <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
             {highlights.map((h, i) => (
@@ -108,7 +126,7 @@ export function InsightCard({ narrative, flags, highlights }: InsightCardProps) 
         </p>
       ) : (
         highlights.length === 0 && (
-          <p style={{ color: tokens.colors.textMuted }}>Aún no hay análisis.</p>
+          <p style={{ color: tokens.colors.textMuted }}>{t.none}</p>
         )
       )}
 
@@ -123,7 +141,7 @@ export function InsightCard({ narrative, flags, highlights }: InsightCardProps) 
               color: tokens.colors.textMuted,
             }}
           >
-            Alertas
+            {t.alerts}
           </h4>
           <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
             {flags.map((flag, i) => (

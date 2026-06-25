@@ -29,7 +29,7 @@ def client(monkeypatch):
     # the network — we're testing the limiter, not the recap.
     monkeypatch.setattr(main, "user_client", lambda token: _FakeClient())
 
-    async def _fake_recap(txns):
+    async def _fake_recap(txns, lang="es"):
         return {"start": None, "end": None, "total": 0, "byCategory": {}, "narrative": ""}
 
     monkeypatch.setattr(main, "weekly_recap", _fake_recap)

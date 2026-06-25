@@ -20,6 +20,55 @@ import { useEffect, useMemo, useState } from "react";
 import { apiGet } from "../lib/api";
 import { formatCurrency } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang, type Lang } from "../lib/i18n";
+
+// Per-component strings. Spanish values are the EXISTING copy byte-for-byte;
+// English is added alongside. Brand-ish "Banco" and currency symbols (S/, US$)
+// are kept; only the words around them translate.
+const T = {
+  es: {
+    title: "Tipo de cambio",
+    oficial: "Oficial",
+    paralelo: "Paralelo",
+    banco: "Banco",
+    ratesError: "No se pudo cargar el tipo de cambio.",
+    loading: "Cargando…",
+    compra: "Compra",
+    venta: "Venta",
+    ventaLower: "venta",
+    compraLower: "compra",
+    dolares: "Dólares (US$)",
+    soles: "Soles (S/)",
+    swap: "Cambiar de moneda",
+    hideDetail: "Ocultar detalle",
+    seeDetail: "Ver detalle",
+    updated: "Actualizado",
+    cached: " (en caché)",
+    referencial: "El paralelo es referencial y no constituye oferta.",
+    hide: "Ocultar",
+  },
+  en: {
+    title: "Exchange rate",
+    oficial: "Official",
+    paralelo: "Parallel",
+    banco: "Bank",
+    ratesError: "Couldn't load the exchange rate.",
+    loading: "Loading…",
+    compra: "Buy",
+    venta: "Sell",
+    ventaLower: "sell",
+    compraLower: "buy",
+    dolares: "Dollars (US$)",
+    soles: "Soles (S/)",
+    swap: "Switch currency",
+    hideDetail: "Hide detail",
+    seeDetail: "See detail",
+    updated: "Updated",
+    cached: " (cached)",
+    referencial: "The parallel rate is indicative and not an offer.",
+    hide: "Hide",
+  },
+} as const;
 
 // --- API contract (mirror backend app/services/fx.py, same as ConverterPanel) ---
 interface RatePair {
@@ -42,20 +91,21 @@ type Source = "oficial" | "paralelo";
 // Converter direction.
 type Dir = "PEN_USD" | "USD_PEN";
 
-const SOURCE_LABELS: Record<Source, string> = {
-  oficial: "Oficial",
-  paralelo: "Paralelo",
-};
+// Display labels for the two converter sources, language-aware. The keys
+// ("oficial"/"paralelo") stay constant — only the rendered text translates.
+function sourceLabel(s: Source, t: (typeof T)[Lang]): string {
+  return s === "oficial" ? t.oficial : t.paralelo;
+}
 
 function fmtRate(v: number | null): string {
   // FX rates show 4 decimals (PEN per USD), e.g. 3.3841. Null -> em dash.
   return v == null ? "—" : v.toFixed(4);
 }
 
-function fmtFetchedAt(iso: string): string {
+function fmtFetchedAt(iso: string, lang: Lang): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("es-PE", {
+  return d.toLocaleString(lang === "en" ? "en-US" : "es-PE", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -106,6 +156,8 @@ function useIsMobile(): boolean {
 }
 
 export function FxWidget() {
+  const lang = useLang();
+  const t = T[lang];
   const [rates, setRates] = useState<RatesResponse | null>(null);
   const [ratesError, setRatesError] = useState<string | null>(null);
 
@@ -150,9 +202,9 @@ export function FxWidget() {
 
   const fromCur = dir === "USD_PEN" ? "USD" : "PEN";
   const toCur = dir === "USD_PEN" ? "PEN" : "USD";
-  const fromLabel = dir === "USD_PEN" ? "Dólares (US$)" : "Soles (S/)";
+  const fromLabel = dir === "USD_PEN" ? t.dolares : t.soles;
   const usedRate = dir === "USD_PEN" ? active?.compra : active?.venta;
-  const usedRateLabel = dir === "USD_PEN" ? "compra" : "venta";
+  const usedRateLabel = dir === "USD_PEN" ? t.compraLower : t.ventaLower;
 
   function swap() {
     setDir((d) => (d === "USD_PEN" ? "PEN_USD" : "USD_PEN"));
@@ -178,7 +230,7 @@ export function FxWidget() {
             font: "inherit",
           }}
         >
-          <span style={{ fontWeight: 500 }}>Tipo de cambio</span>
+          <span style={{ fontWeight: 500 }}>{t.title}</span>
           <span
             style={{
               fontWeight: 500,
@@ -187,7 +239,7 @@ export function FxWidget() {
             }}
           >
             {active
-              ? `${SOURCE_LABELS[source]} · venta ${fmtRate(active.venta)}`
+              ? `${sourceLabel(source, t)} · ${t.ventaLower} ${fmtRate(active.venta)}`
               : "…"}{" "}
             ›
           </span>
@@ -204,10 +256,10 @@ export function FxWidget() {
         }}
       >
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>
-          Tipo de cambio
+          {t.title}
         </h3>
         <div style={{ display: "flex", gap: 6 }}>
-          {(Object.keys(SOURCE_LABELS) as Source[]).map((s) => {
+          {(["oficial", "paralelo"] as Source[]).map((s) => {
             const selected = s === source;
             return (
               <button
@@ -229,7 +281,7 @@ export function FxWidget() {
                   color: selected ? "#ffffff" : tokens.colors.text,
                 }}
               >
-                {SOURCE_LABELS[s]}
+                {sourceLabel(s, t)}
               </button>
             );
           })}
@@ -238,11 +290,11 @@ export function FxWidget() {
 
       {ratesError && (
         <p style={{ ...muted, fontSize: 13, margin: 0 }}>
-          No se pudo cargar el tipo de cambio.
+          {t.ratesError}
         </p>
       )}
       {!rates && !ratesError && (
-        <p style={{ ...muted, fontSize: 13, margin: 0 }}>Cargando…</p>
+        <p style={{ ...muted, fontSize: 13, margin: 0 }}>{t.loading}</p>
       )}
 
       {rates && (
@@ -263,7 +315,7 @@ export function FxWidget() {
                 padding: "8px 10px",
               }}
             >
-              <div style={{ ...muted, fontSize: 11 }}>Compra</div>
+              <div style={{ ...muted, fontSize: 11 }}>{t.compra}</div>
               <div style={{ fontSize: 18, fontWeight: 500 }}>
                 {fmtRate(active?.compra ?? null)}
               </div>
@@ -276,7 +328,7 @@ export function FxWidget() {
                 padding: "8px 10px",
               }}
             >
-              <div style={{ ...muted, fontSize: 11 }}>Venta</div>
+              <div style={{ ...muted, fontSize: 11 }}>{t.venta}</div>
               <div style={{ fontSize: 18, fontWeight: 500 }}>
                 {fmtRate(active?.venta ?? null)}
               </div>
@@ -312,8 +364,8 @@ export function FxWidget() {
             <button
               type="button"
               onClick={swap}
-              aria-label="Cambiar de moneda"
-              title="Cambiar de moneda"
+              aria-label={t.swap}
+              title={t.swap}
               style={{
                 flexShrink: 0,
                 width: 40,
@@ -338,7 +390,7 @@ export function FxWidget() {
               }}
             >
               <span style={{ ...muted, fontSize: 12 }}>
-                {toCur === "PEN" ? "Soles (S/)" : "Dólares (US$)"}
+                {toCur === "PEN" ? t.soles : t.dolares}
               </span>
               <div
                 style={{
@@ -363,7 +415,7 @@ export function FxWidget() {
           {result != null && usedRate != null && (
             <p style={{ ...muted, fontSize: 12, margin: 0 }}>
               {formatCurrency(parseFloat(amount) || 0, fromCur)} ={" "}
-              {formatCurrency(result, toCur)} · {SOURCE_LABELS[source]} (
+              {formatCurrency(result, toCur)} · {sourceLabel(source, t)} (
               {usedRateLabel} {fmtRate(usedRate)})
             </p>
           )}
@@ -383,7 +435,7 @@ export function FxWidget() {
               color: tokens.colors.accent,
             }}
           >
-            {showDetail ? "Ocultar detalle" : "Ver detalle"}
+            {showDetail ? t.hideDetail : t.seeDetail}
           </button>
 
           {showDetail && (
@@ -398,9 +450,9 @@ export function FxWidget() {
             >
               {(
                 [
-                  { key: "oficial", label: "Oficial", pair: rates.oficial },
-                  { key: "paralelo", label: "Paralelo", pair: rates.paralelo },
-                  { key: "bank", label: "Banco", pair: rates.bank },
+                  { key: "oficial", label: t.oficial, pair: rates.oficial },
+                  { key: "paralelo", label: t.paralelo, pair: rates.paralelo },
+                  { key: "bank", label: t.banco, pair: rates.bank },
                 ] as { key: string; label: string; pair: RatePair }[]
               ).map((row) => (
                 <div
@@ -418,11 +470,11 @@ export function FxWidget() {
                 </div>
               ))}
               <p style={{ ...muted, fontSize: 11, margin: 0 }}>
-                Actualizado: {fmtFetchedAt(rates.fetched_at)}
-                {rates.stale ? " (en caché)" : ""}
+                {t.updated}: {fmtFetchedAt(rates.fetched_at, lang)}
+                {rates.stale ? t.cached : ""}
               </p>
               <p style={{ ...muted, fontSize: 11, margin: 0 }}>
-                El paralelo es referencial y no constituye oferta.
+                {t.referencial}
               </p>
             </div>
           )}
@@ -442,7 +494,7 @@ export function FxWidget() {
                 font: "inherit",
               }}
             >
-              ▾ Ocultar
+              ▾ {t.hide}
             </button>
           )}
         </>

@@ -6,6 +6,7 @@
 // the "depth" the senior role asks about. Read the apiGet signature carefully.
 // ---------------------------------------------------------------------------
 import { supabase } from "./supabase";
+import { getLang } from "./i18n";
 
 // In production set VITE_API_BASE to the deployed backend URL. For local dev we
 // fall back to the localhost backend so `npm run dev` works without a .env file.
@@ -38,7 +39,10 @@ async function getToken(): Promise<string | null> {
 export async function apiGet<T>(path: string): Promise<T> {
   const token = await getToken();
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      "X-Lang": getLang(),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   if (!res.ok) {
     throw new Error(`API ${res.status}: ${await res.text()}`);
@@ -56,6 +60,7 @@ export async function apiPost<TBody, TResponse>(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "X-Lang": getLang(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
@@ -76,6 +81,7 @@ export async function apiPut<TBody, TResponse>(
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      "X-Lang": getLang(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
@@ -96,6 +102,7 @@ export async function apiPatch<TBody, TResponse>(
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
+      "X-Lang": getLang(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
@@ -111,7 +118,10 @@ export async function apiDelete<TResponse>(path: string): Promise<TResponse> {
   const token = await getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      "X-Lang": getLang(),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
   if (!res.ok) {
     throw new Error(`API ${res.status}: ${await res.text()}`);
@@ -142,7 +152,10 @@ export async function apiUpload<T>(
   }
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: {
+      "X-Lang": getLang(),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: form,
   });
   if (!res.ok) {

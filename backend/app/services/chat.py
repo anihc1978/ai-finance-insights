@@ -83,9 +83,21 @@ _TOOLS = [
 ]
 
 
-def _system_prompt(currency: str) -> str:
+def _system_prompt(currency: str, lang: str = "es") -> str:
     """Persona: answer ONLY from tool data; format money in the user's currency."""
     symbol = CURRENCY_SYMBOLS.get(currency, "$")
+    if lang == "en":
+        return (
+            "You are a friendly, concise personal-finance assistant. You help one "
+            "person understand their own spending. Always answer in natural English "
+            "with a warm, trusted tone. Answer ONLY with the data your tools return — "
+            "never invent transactions, totals or trends. If the tools show no "
+            "relevant data, say so clearly and suggest what the person could ask. Use "
+            "the symbol 'S/' for Peruvian soles and "
+            f"format every amount with the symbol '{symbol}' (the person's currency is "
+            f"{currency}). Keep answers short and specific, citing the real category "
+            "names and amounts. Do NOT give investment advice."
+        )
     return (
         "Eres un asistente de finanzas personales amigable y conciso. Ayudas a una "
         "sola persona a entender sus propios gastos. Responde SIEMPRE en español "
@@ -176,14 +188,17 @@ def _run_tool(client, name: str, args: dict) -> dict:
     return {"error": f"Unknown tool: {name}"}
 
 
-async def build_chat_reply(client, currency: str, message: str, history: list) -> dict:
+async def build_chat_reply(
+    client, currency: str, message: str, history: list, lang: str = "es"
+) -> dict:
     """Run the Claude tool-use loop for one chat turn and return {reply: str}.
 
     `client` is an RLS-scoped Supabase client (queries hit only this user's rows).
     `history` is the prior conversation as [{role: user|assistant, content: str}].
+    `lang` ("es"|"en") selects the language the assistant answers in.
     """
     anthropic = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    system = _system_prompt(currency)
+    system = _system_prompt(currency, lang)
 
     # Start from the prior turns, then append this message. As the loop runs we
     # append the model's tool_use turns and our tool_result turns in between.

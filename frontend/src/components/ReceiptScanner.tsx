@@ -16,6 +16,28 @@
 import { useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { tokens } from "../lib/theme";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    title: "Escanear recibos Yape / Plin",
+    subtitle:
+      "Sube las capturas de tus constancias de Yape o Plin. Las leemos y las agregamos como transacciones automáticamente.",
+    reading: "Leyendo…",
+    upload: "Subir recibos",
+    imported: (n: number, dup: number) => `${n} importados, ${dup} duplicados`,
+    error: "No se pudieron leer los recibos.",
+  },
+  en: {
+    title: "Scan Yape / Plin receipts",
+    subtitle:
+      "Upload screenshots of your Yape or Plin receipts. We read them and add them as transactions automatically.",
+    reading: "Reading…",
+    upload: "Upload receipts",
+    imported: (n: number, dup: number) => `${n} imported, ${dup} duplicates`,
+    error: "We couldn't read the receipts.",
+  },
+} as const;
 
 const API_BASE = import.meta.env.VITE_API_BASE as string;
 
@@ -89,6 +111,8 @@ async function uploadReceipts(files: File[]): Promise<ScanReceiptsResponse> {
 }
 
 export function ReceiptScanner({ onImported }: ReceiptScannerProps) {
+  const lang = useLang();
+  const t = T[lang];
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
   const [result, setResult] = useState<ScanReceiptsResponse | null>(null);
@@ -116,11 +140,10 @@ export function ReceiptScanner({ onImported }: ReceiptScannerProps) {
   return (
     <section style={card}>
       <h3 style={{ margin: `0 0 ${tokens.spacing.sm}px`, fontWeight: 500 }}>
-        Escanear recibos Yape / Plin
+        {t.title}
       </h3>
       <p style={{ ...muted, fontSize: 13, margin: `0 0 ${tokens.spacing.md}px` }}>
-        Sube las capturas de tus constancias de Yape o Plin. Las leemos y las
-        agregamos como transacciones automáticamente.
+        {t.subtitle}
       </p>
 
       <input
@@ -138,18 +161,18 @@ export function ReceiptScanner({ onImported }: ReceiptScannerProps) {
         disabled={busy}
         style={{ ...button, opacity: busy ? 0.6 : 1, cursor: busy ? "default" : "pointer" }}
       >
-        {busy ? "Leyendo…" : "Subir recibos"}
+        {busy ? t.reading : t.upload}
       </button>
 
       {result && (
         <p style={{ fontSize: 14, marginTop: tokens.spacing.md }}>
-          {result.imported} importados, {result.skipped_duplicates} duplicados
+          {t.imported(result.imported, result.skipped_duplicates)}
         </p>
       )}
 
       {error && (
         <p style={{ ...muted, fontSize: 14, marginTop: tokens.spacing.md }}>
-          No se pudieron leer los recibos.
+          {t.error}
         </p>
       )}
     </section>

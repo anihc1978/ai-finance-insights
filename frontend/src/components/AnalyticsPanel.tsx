@@ -38,6 +38,52 @@ import {
 } from "../lib/format";
 import { tokens } from "../lib/theme";
 import { SOURCE_CHIPS } from "./SourceBadge";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: {
+    intro:
+      "Aquí ves todo en detalle: tus gráficos de gastos, ingresos, tipo de cambio y AFP. El resumen se queda simple — esto es para cuando quieres profundizar.",
+    loading: "Cargando…",
+    projection: "Proyección",
+    spend: "Gasto",
+    catTitle: "Gasto por categoría",
+    catEmpty: "No hay gastos para mostrar este mes.",
+    trendTitle: "Tendencia de gasto mensual",
+    trendEmpty: "Aún no hay suficiente historial.",
+    trendNote: "La línea punteada es la proyección del próximo mes.",
+    incomeTitle: "Ingresos por fuente",
+    incomeEmpty: "Aún no hay ingresos con una fuente identificada.",
+    fxTitle: "Tipo de cambio — historial",
+    fxEmpty: "Aún no hay historial de tipo de cambio.",
+    fxTooltip: "Venta (S/ por US$)",
+    fxNote: "Tipo de cambio oficial (venta), últimos 90 días.",
+    afpTitle: "AFP — evolución del saldo",
+    afpEmpty:
+      "Agrega al menos dos registros de AFP para ver la evolución de tu fondo.",
+  },
+  en: {
+    intro:
+      "Here you see everything in detail: your charts for spending, income, exchange rate and AFP. The overview stays simple — this is for when you want to dig deeper.",
+    loading: "Loading…",
+    projection: "Projection",
+    spend: "Spent",
+    catTitle: "Spending by category",
+    catEmpty: "No spending to show this month.",
+    trendTitle: "Monthly spending trend",
+    trendEmpty: "Not enough history yet.",
+    trendNote: "The dashed line is next month's projection.",
+    incomeTitle: "Income by source",
+    incomeEmpty: "No income with an identified source yet.",
+    fxTitle: "Exchange rate — history",
+    fxEmpty: "No exchange-rate history yet.",
+    fxTooltip: "Sell (S/ per US$)",
+    fxNote: "Official exchange rate (sell), last 90 days.",
+    afpTitle: "AFP — balance over time",
+    afpEmpty:
+      "Add at least two AFP records to see your fund evolve over time.",
+  },
+} as const;
 
 // --- Endpoint contracts (mirror the shapes the rest of the app already uses) ---
 
@@ -113,11 +159,12 @@ function ChartCard({
   emptyText: string;
   children: React.ReactNode;
 }) {
+  const lang = useLang();
   return (
     <section style={cardStyle}>
       <h3 style={titleStyle}>{title}</h3>
       {loading ? (
-        <p style={mutedTextStyle}>Cargando…</p>
+        <p style={mutedTextStyle}>{T[lang].loading}</p>
       ) : ready ? (
         children
       ) : (
@@ -137,6 +184,8 @@ function categoryColor(category: string): string {
 }
 
 export function AnalyticsPanel() {
+  const lang = useLang();
+  const t = T[lang];
   const [insights, setInsights] = useState<Insights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(true);
 
@@ -185,7 +234,7 @@ export function AnalyticsPanel() {
     .map((d) => ({
       category: d.category,
       amount: d.amount,
-      label: categoryLabel(d.category),
+      label: categoryLabel(d.category, lang),
     }))
     .sort((a, b) => b.amount - a.amount);
 
@@ -208,7 +257,7 @@ export function AnalyticsPanel() {
     last.projected = last.spend;
     base.push({
       month: "forecast",
-      label: "Proyección",
+      label: t.projection,
       spend: null as unknown as number,
       projected: forecast,
     });
@@ -255,17 +304,15 @@ export function AnalyticsPanel() {
     <div style={wrap}>
       {/* Intro: this is the "detalle de todo" page; keep the overview simple. */}
       <p style={{ ...mutedTextStyle, fontSize: 14 }}>
-        Aquí ves todo en detalle: tus gráficos de gastos, ingresos, tipo de
-        cambio y AFP. El resumen se queda simple — esto es para cuando quieres
-        profundizar.
+        {t.intro}
       </p>
 
       {/* (1) Gasto por categoría */}
       <ChartCard
-        title="Gasto por categoría"
+        title={t.catTitle}
         loading={insightsLoading}
         ready={categoryData.length > 0}
-        emptyText="No hay gastos para mostrar este mes."
+        emptyText={t.catEmpty}
       >
         <div style={chartBox}>
           <ResponsiveContainer width="100%" height="100%">
@@ -306,10 +353,10 @@ export function AnalyticsPanel() {
 
       {/* (2) Tendencia de gasto mensual (con proyección) */}
       <ChartCard
-        title="Tendencia de gasto mensual"
+        title={t.trendTitle}
         loading={insightsLoading}
         ready={hasTrend}
-        emptyText="Aún no hay suficiente historial."
+        emptyText={t.trendEmpty}
       >
         <div style={chartBox}>
           <ResponsiveContainer width="100%" height="100%">
@@ -340,7 +387,7 @@ export function AnalyticsPanel() {
               <Tooltip
                 formatter={(value: number, name) => [
                   formatCurrency(value, CURRENCY),
-                  name === "projected" ? "Proyección" : "Gasto",
+                  name === "projected" ? t.projection : t.spend,
                 ]}
               />
               {/* Real history */}
@@ -369,16 +416,16 @@ export function AnalyticsPanel() {
           </ResponsiveContainer>
         </div>
         <p style={{ ...mutedTextStyle, marginTop: tokens.spacing.sm }}>
-          La línea punteada es la proyección del próximo mes.
+          {t.trendNote}
         </p>
       </ChartCard>
 
       {/* (3) Ingresos por fuente */}
       <ChartCard
-        title="Ingresos por fuente"
+        title={t.incomeTitle}
         loading={txnsLoading}
         ready={incomeData.length > 0}
-        emptyText="Aún no hay ingresos con una fuente identificada."
+        emptyText={t.incomeEmpty}
       >
         <div style={chartBox}>
           <ResponsiveContainer width="100%" height="100%">
@@ -416,10 +463,10 @@ export function AnalyticsPanel() {
 
       {/* (4) Tipo de cambio — historial */}
       <ChartCard
-        title="Tipo de cambio — historial"
+        title={t.fxTitle}
         loading={historyLoading}
         ready={fxData.length > 1}
-        emptyText="Aún no hay historial de tipo de cambio."
+        emptyText={t.fxEmpty}
       >
         <div style={chartBox}>
           <ResponsiveContainer width="100%" height="100%">
@@ -444,7 +491,7 @@ export function AnalyticsPanel() {
                 tickFormatter={(v: number) => v.toFixed(2)}
               />
               <Tooltip
-                formatter={(value: number) => [value.toFixed(4), "Venta (S/ por US$)"]}
+                formatter={(value: number) => [value.toFixed(4), t.fxTooltip]}
               />
               <Line
                 type="monotone"
@@ -457,16 +504,16 @@ export function AnalyticsPanel() {
           </ResponsiveContainer>
         </div>
         <p style={{ ...mutedTextStyle, marginTop: tokens.spacing.sm }}>
-          Tipo de cambio oficial (venta), últimos 90 días.
+          {t.fxNote}
         </p>
       </ChartCard>
 
       {/* (5) AFP — evolución del saldo */}
       <ChartCard
-        title="AFP — evolución del saldo"
+        title={t.afpTitle}
         loading={afpLoading}
         ready={afpData.length > 1}
-        emptyText="Agrega al menos dos registros de AFP para ver la evolución de tu fondo."
+        emptyText={t.afpEmpty}
       >
         <div style={chartBox}>
           <ResponsiveContainer width="100%" height="100%">

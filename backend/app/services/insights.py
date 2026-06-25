@@ -37,6 +37,27 @@ _NARRATIVE_SYSTEM = (
     "Sin markdown."
 )
 
+_NARRATIVE_SYSTEM_EN = (
+    "You are a friendly personal-finance analyst. From a person's monthly spending "
+    "summary, write a concise narrative in natural English (3 to 5 sentences), with a "
+    "warm, trusted tone, about where their money went and the notable changes versus "
+    "previous months. Then list short, SPECIFIC, contextual alerts (like a financial "
+    "advisor): each alert must cite the concrete merchant or category and the approximate "
+    "amount, and the date when possible (e.g. 'Unusual spending on dining: S/ 420, +34% "
+    "vs last month'); also include recurring patterns you notice (e.g. 'Coffee shop ~3 "
+    "times a week, ~S/ 90 a month') and any sharp jumps between months. Avoid generic "
+    "alerts. Use the symbol 'S/' for Peruvian soles. Be specific with the category names "
+    "and approximate amounts. Do NOT give investment advice. "
+    "Also include 'highlights': exactly 3 short bullets (in the style of 'Here is what we "
+    "found'), each with a brief title and a one-line detail, in natural English and with a "
+    "warm tone. The first about income, the second about spending and the third about the "
+    'margin or savings. For example: {"title": "Stable income", '
+    '"detail": "You earn around S/ X a month."}. '
+    "Respond ONLY as JSON: "
+    '{"narrative": str, "flags": [str, ...], "highlights": [{"title": str, "detail": str}, ...]}. '
+    "No markdown."
+)
+
 
 def _strip_fences(text: str) -> str:
     """Tolerate ```json ... ``` fences the model may wrap its answer in."""
@@ -49,7 +70,7 @@ def _strip_fences(text: str) -> str:
 
 
 async def _narrative_and_flags(
-    month: str, agg: dict, forecast: float
+    month: str, agg: dict, forecast: float, lang: str = "es"
 ) -> tuple[str, list[str], list[dict]]:
     """One Claude call that turns the aggregated numbers into prose + flags + highlights."""
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
@@ -64,7 +85,7 @@ async def _narrative_and_flags(
     message = await client.messages.create(
         model=INSIGHTS_MODEL,
         max_tokens=1200,
-        system=_NARRATIVE_SYSTEM,
+        system=_NARRATIVE_SYSTEM_EN if lang == "en" else _NARRATIVE_SYSTEM,
         messages=[
             {
                 "role": "user",
@@ -91,12 +112,12 @@ async def _narrative_and_flags(
     return narrative, flags, highlights
 
 
-async def build_insight(transactions: list[dict], month: str) -> dict:
+async def build_insight(transactions: list[dict], month: str, lang: str = "es") -> dict:
     """Build the full GET /insights response for `month` from all transactions."""
     agg = aggregate(transactions, month)
     monthly_spend = [row["spend"] for row in agg["monthOverMonth"]]
     forecast = forecast_next_month(monthly_spend)
-    narrative, flags, highlights = await _narrative_and_flags(month, agg, forecast)
+    narrative, flags, highlights = await _narrative_and_flags(month, agg, forecast, lang)
 
     return {
         "month": month,

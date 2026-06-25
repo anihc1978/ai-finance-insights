@@ -38,8 +38,10 @@ import { TransactionEditor } from "../components/TransactionEditor";
 import { SourceBadge, SOURCE_CHIPS } from "../components/SourceBadge";
 import { ProfileAvatar } from "../components/ProfileAvatar";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { LanguageToggle } from "../components/LanguageToggle";
 import { tokens } from "../lib/theme";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
+import { useLang } from "../lib/i18n";
 
 // The currency a transaction is denominated in (mirrors the backend column).
 type TxnCurrency = "PEN" | "USD";
@@ -95,6 +97,8 @@ function useIsMobile(): boolean {
 
 export function Dashboard() {
   const { signOut } = useAuth();
+  const lang = useLang();
+  const t = T[lang];
   const isMobile = useIsMobile();
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [insights, setInsights] = useState<Insights | null>(null);
@@ -120,6 +124,9 @@ export function Dashboard() {
   const [editor, setEditor] = useState<
     { mode: "add" | "edit"; txn?: Transaction } | null
   >(null);
+
+  // The section tabs in the current language.
+  const tabs = tabsFor(t);
 
   // Delete a transaction, then refresh the table + insights.
   async function handleDeleteTxn(id: string) {
@@ -295,9 +302,10 @@ export function Dashboard() {
             flexWrap: "wrap",
           }}
         >
+          <LanguageToggle />
           <ThemeToggle />
           <ProfileAvatar />
-          <button onClick={signOut}>Cerrar sesión</button>
+          <button onClick={signOut}>{t.signOut}</button>
         </div>
       </header>
 
@@ -314,7 +322,7 @@ export function Dashboard() {
           }}
         >
           <select
-            aria-label="Sección"
+            aria-label={t.sectionAria}
             value={tab}
             onChange={(e) => setTab(e.target.value as Tab)}
             style={{
@@ -328,9 +336,9 @@ export function Dashboard() {
               borderRadius: tokens.radii.input,
             }}
           >
-            {TABS.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
+            {tabs.map((tb) => (
+              <option key={tb.id} value={tb.id}>
+                {tb.label}
               </option>
             ))}
           </select>
@@ -347,25 +355,25 @@ export function Dashboard() {
             WebkitOverflowScrolling: "touch",
           }}
         >
-          {TABS.map((t) => (
+          {tabs.map((tb) => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
+              key={tb.id}
+              onClick={() => setTab(tb.id)}
               style={{
                 padding: "8px 14px",
                 border: "none",
                 borderBottom:
-                  tab === t.id
+                  tab === tb.id
                     ? `2px solid ${tokens.colors.accent}`
                     : "2px solid transparent",
                 background: "none",
                 cursor: "pointer",
-                fontWeight: tab === t.id ? 500 : 400,
+                fontWeight: tab === tb.id ? 500 : 400,
                 whiteSpace: "nowrap",
-                color: tab === t.id ? tokens.colors.text : tokens.colors.textMuted,
+                color: tab === tb.id ? tokens.colors.text : tokens.colors.textMuted,
               }}
             >
-              {t.label}
+              {tb.label}
             </button>
           ))}
         </nav>
@@ -392,15 +400,15 @@ export function Dashboard() {
               }}
             >
               <KpiCard
-                label="Ingresos"
+                label={t.income}
                 value={formatCurrency(insights.totalIncome, currency)}
               />
               <KpiCard
-                label="Gastado"
+                label={t.spent}
                 value={formatCurrency(insights.totalSpend, currency)}
               />
               <KpiCard
-                label="Ahorrado"
+                label={t.saved}
                 value={formatCurrency(
                   insights.totalIncome - insights.totalSpend,
                   currency,
@@ -414,12 +422,12 @@ export function Dashboard() {
                         : "flat",
                   text:
                     insights.totalIncome - insights.totalSpend >= 0
-                      ? "Saldo positivo"
-                      : "Saldo negativo",
+                      ? t.positiveBalance
+                      : t.negativeBalance,
                 }}
               />
               <KpiCard
-                label="Pronóstico próximo mes"
+                label={t.forecastNextMonth}
                 value={formatCurrency(insights.forecastNextMonth, currency)}
               />
             </div>
@@ -446,7 +454,7 @@ export function Dashboard() {
             }}
           >
             <h3 style={{ marginTop: 0, marginBottom: 2, fontWeight: 500 }}>
-              Yape y Plin
+              {t.yapePlinTitle}
             </h3>
             <p
               style={{
@@ -455,7 +463,7 @@ export function Dashboard() {
                 color: tokens.colors.textMuted,
               }}
             >
-              Lo que has gastado y enviado por cada billetera.
+              {t.yapePlinSub}
             </p>
             <div
               style={{
@@ -484,7 +492,7 @@ export function Dashboard() {
                       color: tokens.colors.textMuted,
                     }}
                   >
-                    Gastado / enviado
+                    {t.spentSent}
                   </p>
                   <p style={{ margin: "2px 0 2px", fontSize: 24, fontWeight: 600 }}>
                     {formatCurrency(w.out, currency)}
@@ -497,9 +505,9 @@ export function Dashboard() {
                     }}
                   >
                     {w.count}{" "}
-                    {w.count === 1 ? "movimiento" : "movimientos"}
+                    {w.count === 1 ? t.transactionSingular : t.transactionPlural}
                     {w.inc > 0
-                      ? ` · recibido ${formatCurrency(w.inc, currency)}`
+                      ? ` · ${t.received} ${formatCurrency(w.inc, currency)}`
                       : ""}
                   </p>
                 </div>
@@ -524,7 +532,7 @@ export function Dashboard() {
               }}
             >
               <h3 style={{ marginTop: 0, fontWeight: 500 }}>
-                Ingresos por fuente
+                {t.incomeBySource}
               </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {incomeBySource.map(([key, total]) => (
@@ -602,7 +610,7 @@ export function Dashboard() {
               borderRadius: tokens.radii.card,
             }}
           >
-            <h3 style={{ marginTop: 0, fontWeight: 500 }}>Importar movimientos</h3>
+            <h3 style={{ marginTop: 0, fontWeight: 500 }}>{t.importTransactions}</h3>
             <div
               style={{
                 display: "flex",
@@ -626,13 +634,13 @@ export function Dashboard() {
                   color: tokens.colors.textMuted,
                 }}
               >
-                Moneda
+                {t.currencyLabel}
                 <select
                   value={importCurrency}
                   onChange={(e) =>
                     setImportCurrency(e.target.value as TxnCurrency)
                   }
-                  aria-label="Moneda de importación"
+                  aria-label={t.importCurrencyAria}
                   style={{
                     padding: "6px 8px",
                     fontSize: 14,
@@ -654,11 +662,11 @@ export function Dashboard() {
                   color: tokens.colors.textMuted,
                 }}
               >
-                Origen
+                {t.sourceLabel}
                 <select
                   value={importSource}
                   onChange={(e) => setImportSource(e.target.value)}
-                  aria-label="Origen de importación"
+                  aria-label={t.importSourceAria}
                   style={{
                     padding: "6px 8px",
                     fontSize: 14,
@@ -667,7 +675,7 @@ export function Dashboard() {
                     background: "white",
                   }}
                 >
-                  <option value="">Sin especificar</option>
+                  <option value="">{t.unspecified}</option>
                   {Object.entries(SOURCE_CHIPS).map(([key, chip]) => (
                     <option key={key} value={key}>
                       {chip.label}
@@ -675,18 +683,18 @@ export function Dashboard() {
                   ))}
                 </select>
               </label>
-              {importing && <span>Importando y categorizando con IA…</span>}
+              {importing && <span>{t.importingWithAI}</span>}
             </div>
             <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button onClick={handleCategorize} disabled={categorizing || recategorizing}>
-                {categorizing ? "Categorizando…" : "Categorizar con IA"}
+                {categorizing ? t.categorizing : t.categorizeWithAI}
               </button>
               <button
                 onClick={handleRecategorize}
                 disabled={categorizing || recategorizing}
                 title="Relabel old movements stuck in 'Otros'"
               >
-                {recategorizing ? "Re-categorizando…" : "Re-categorizar todo"}
+                {recategorizing ? t.recategorizing : t.recategorizeAll}
               </button>
             </div>
 
@@ -711,15 +719,15 @@ export function Dashboard() {
               }}
             >
               <h3 style={{ fontWeight: 500 }}>
-                Tus movimientos ({txns.length})
+                {t.yourTransactions} ({txns.length})
               </h3>
               <button onClick={() => setEditor({ mode: "add" })}>
-                + Agregar movimiento
+                + {t.addTransaction}
               </button>
             </div>
             {txns.length === 0 ? (
               <p style={{ color: tokens.colors.textMuted }}>
-                Aún no hay movimientos — importa un CSV arriba.
+                {t.noTransactions}
               </p>
             ) : isMobile ? (
               /* Stacked cards on a phone so nothing overflows horizontally. */
@@ -731,11 +739,11 @@ export function Dashboard() {
                   marginTop: tokens.spacing.sm,
                 }}
               >
-                {txns.slice(0, visibleCount).map((t) => {
-                  const amount = Number(t.amount);
+                {txns.slice(0, visibleCount).map((txn) => {
+                  const amount = Number(txn.amount);
                   return (
                     <div
-                      key={t.id}
+                      key={txn.id}
                       style={{
                         padding: tokens.spacing.md,
                         background: tokens.colors.surface,
@@ -760,7 +768,7 @@ export function Dashboard() {
                             color: tokens.colors.textMuted,
                           }}
                         >
-                          {t.date}
+                          {txn.date}
                         </span>
                         <strong
                           style={{
@@ -768,10 +776,10 @@ export function Dashboard() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {formatCurrency(amount, t.currency)}
+                          {formatCurrency(amount, txn.currency)}
                         </strong>
                       </div>
-                      <div style={{ fontWeight: 500 }}>{t.description}</div>
+                      <div style={{ fontWeight: 500 }}>{txn.description}</div>
                       <div
                         style={{
                           display: "flex",
@@ -780,15 +788,15 @@ export function Dashboard() {
                           gap: 4,
                         }}
                       >
-                        <SourceBadge source={t.source} />
-                        <CurrencyBadge currency={t.currency} />
+                        <SourceBadge source={txn.source} />
+                        <CurrencyBadge currency={txn.currency} />
                         <span
                           style={{
                             fontSize: 12,
                             color: tokens.colors.textMuted,
                           }}
                         >
-                          {categoryLabel(t.category)}
+                          {categoryLabel(txn.category, lang)}
                         </span>
                       </div>
                       <div
@@ -800,20 +808,20 @@ export function Dashboard() {
                         }}
                       >
                         <button
-                          onClick={() => setEditor({ mode: "edit", txn: t })}
+                          onClick={() => setEditor({ mode: "edit", txn })}
                           style={{ fontSize: 12, padding: "4px 10px" }}
                         >
-                          Editar
+                          {t.edit}
                         </button>
                         <button
-                          onClick={() => handleDeleteTxn(t.id)}
+                          onClick={() => handleDeleteTxn(txn.id)}
                           style={{
                             fontSize: 12,
                             padding: "4px 10px",
                             color: "crimson",
                           }}
                         >
-                          Eliminar
+                          {t.delete}
                         </button>
                       </div>
                     </div>
@@ -829,28 +837,28 @@ export function Dashboard() {
                       borderBottom: `1px solid ${tokens.colors.border}`,
                     }}
                   >
-                    <th style={{ padding: 8 }}>Fecha</th>
-                    <th style={{ padding: 8 }}>Descripción</th>
-                    <th style={{ padding: 8, textAlign: "right" }}>Monto</th>
-                    <th style={{ padding: 8 }}>Categoría</th>
-                    <th style={{ padding: 8, textAlign: "right" }}>Acciones</th>
+                    <th style={{ padding: 8 }}>{t.thDate}</th>
+                    <th style={{ padding: 8 }}>{t.thDescription}</th>
+                    <th style={{ padding: 8, textAlign: "right" }}>{t.thAmount}</th>
+                    <th style={{ padding: 8 }}>{t.thCategory}</th>
+                    <th style={{ padding: 8, textAlign: "right" }}>{t.thActions}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {txns.slice(0, visibleCount).map((t) => {
-                    const amount = Number(t.amount);
+                  {txns.slice(0, visibleCount).map((txn) => {
+                    const amount = Number(txn.amount);
                     return (
                       <tr
-                        key={t.id}
+                        key={txn.id}
                         style={{
                           borderBottom: `1px solid ${tokens.colors.border}`,
                         }}
                       >
-                        <td style={{ padding: 8 }}>{t.date}</td>
+                        <td style={{ padding: 8 }}>{txn.date}</td>
                         <td style={{ padding: 8 }}>
-                          {t.description}
-                          <SourceBadge source={t.source} />
-                          <CurrencyBadge currency={t.currency} />
+                          {txn.description}
+                          <SourceBadge source={txn.source} />
+                          <CurrencyBadge currency={txn.currency} />
                         </td>
                         <td
                           style={{
@@ -859,20 +867,20 @@ export function Dashboard() {
                             color: amount < 0 ? "crimson" : "green",
                           }}
                         >
-                          {formatCurrency(amount, t.currency)}
+                          {formatCurrency(amount, txn.currency)}
                         </td>
                         <td style={{ padding: 8, color: tokens.colors.textMuted }}>
-                          {categoryLabel(t.category)}
+                          {categoryLabel(txn.category, lang)}
                         </td>
                         <td style={{ padding: 8, textAlign: "right", whiteSpace: "nowrap" }}>
                           <button
-                            onClick={() => setEditor({ mode: "edit", txn: t })}
+                            onClick={() => setEditor({ mode: "edit", txn })}
                             style={{ fontSize: 12, padding: "2px 8px" }}
                           >
-                            Editar
+                            {t.edit}
                           </button>
                           <button
-                            onClick={() => handleDeleteTxn(t.id)}
+                            onClick={() => handleDeleteTxn(txn.id)}
                             style={{
                               fontSize: 12,
                               padding: "2px 8px",
@@ -880,7 +888,7 @@ export function Dashboard() {
                               color: "crimson",
                             }}
                           >
-                            Eliminar
+                            {t.delete}
                           </button>
                         </td>
                       </tr>
@@ -892,7 +900,7 @@ export function Dashboard() {
             {txns.length > visibleCount && (
               <div style={{ marginTop: 12 }}>
                 <button onClick={() => setVisibleCount((n) => n + 10)}>
-                  Ver más movimientos ({txns.length - visibleCount} restantes)
+                  {t.seeMoreTransactions} ({t.remaining(txns.length - visibleCount)})
                 </button>
               </div>
             )}
@@ -951,11 +959,111 @@ function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
   );
 }
 
-// Tab definitions, kept module-level so the render loop stays declarative.
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Resumen" },
-  { id: "analisis", label: "📊 Análisis" },
-  { id: "suscripciones", label: "Suscripciones" },
-  { id: "budgets", label: "Presupuestos" },
-  { id: "goals", label: "Metas" },
-];
+// Tab definitions, kept module-level so the render loop stays declarative. The
+// labels come from the active language's strings (passed in) so the bar
+// translates without restructuring the loop.
+function tabsFor(t: (typeof T)[keyof typeof T]): { id: Tab; label: string }[] {
+  return [
+    { id: "overview", label: t.tabOverview },
+    { id: "analisis", label: t.tabAnalytics },
+    { id: "suscripciones", label: t.tabSubscriptions },
+    { id: "budgets", label: t.tabBudgets },
+    { id: "goals", label: t.tabGoals },
+  ];
+}
+
+// Per-component translations. The `es` values are the EXACT Spanish text this
+// page shipped with (do not reword); `en` is the new English. Brand names
+// (Yape, Plin), currency symbols (S/, US$) and category KEYS are not translated.
+const T = {
+  es: {
+    signOut: "Cerrar sesión",
+    sectionAria: "Sección",
+    tabOverview: "Resumen",
+    tabAnalytics: "📊 Análisis",
+    tabSubscriptions: "Suscripciones",
+    tabBudgets: "Presupuestos",
+    tabGoals: "Metas",
+    income: "Ingresos",
+    spent: "Gastado",
+    saved: "Ahorrado",
+    positiveBalance: "Saldo positivo",
+    negativeBalance: "Saldo negativo",
+    forecastNextMonth: "Pronóstico próximo mes",
+    yapePlinTitle: "Yape y Plin",
+    yapePlinSub: "Lo que has gastado y enviado por cada billetera.",
+    spentSent: "Gastado / enviado",
+    transactionSingular: "movimiento",
+    transactionPlural: "movimientos",
+    received: "recibido",
+    incomeBySource: "Ingresos por fuente",
+    importTransactions: "Importar movimientos",
+    currencyLabel: "Moneda",
+    importCurrencyAria: "Moneda de importación",
+    sourceLabel: "Origen",
+    importSourceAria: "Origen de importación",
+    unspecified: "Sin especificar",
+    importingWithAI: "Importando y categorizando con IA…",
+    categorizing: "Categorizando…",
+    categorizeWithAI: "Categorizar con IA",
+    recategorizing: "Re-categorizando…",
+    recategorizeAll: "Re-categorizar todo",
+    yourTransactions: "Tus movimientos",
+    addTransaction: "Agregar movimiento",
+    noTransactions: "Aún no hay movimientos — importa un CSV arriba.",
+    edit: "Editar",
+    delete: "Eliminar",
+    thDate: "Fecha",
+    thDescription: "Descripción",
+    thAmount: "Monto",
+    thCategory: "Categoría",
+    thActions: "Acciones",
+    seeMoreTransactions: "Ver más movimientos",
+    remaining: (n: number) => `${n} restantes`,
+  },
+  en: {
+    signOut: "Sign out",
+    sectionAria: "Section",
+    tabOverview: "Overview",
+    tabAnalytics: "📊 Analytics",
+    tabSubscriptions: "Subscriptions",
+    tabBudgets: "Budgets",
+    tabGoals: "Goals",
+    income: "Income",
+    spent: "Spent",
+    saved: "Saved",
+    positiveBalance: "Positive balance",
+    negativeBalance: "Negative balance",
+    forecastNextMonth: "Next-month forecast",
+    yapePlinTitle: "Yape & Plin",
+    yapePlinSub: "What you've spent and sent through each wallet.",
+    spentSent: "Spent / sent",
+    transactionSingular: "transaction",
+    transactionPlural: "transactions",
+    received: "received",
+    incomeBySource: "Income by source",
+    importTransactions: "Import transactions",
+    currencyLabel: "Currency",
+    importCurrencyAria: "Import currency",
+    sourceLabel: "Source",
+    importSourceAria: "Import source",
+    unspecified: "Unspecified",
+    importingWithAI: "Importing and categorizing with AI…",
+    categorizing: "Categorizing…",
+    categorizeWithAI: "Categorize with AI",
+    recategorizing: "Re-categorizing…",
+    recategorizeAll: "Re-categorize all",
+    yourTransactions: "Your transactions",
+    addTransaction: "Add transaction",
+    noTransactions: "No transactions yet — import a CSV above.",
+    edit: "Edit",
+    delete: "Delete",
+    thDate: "Date",
+    thDescription: "Description",
+    thAmount: "Amount",
+    thCategory: "Category",
+    thActions: "Actions",
+    seeMoreTransactions: "See more transactions",
+    remaining: (n: number) => `${n} remaining`,
+  },
+} as const;

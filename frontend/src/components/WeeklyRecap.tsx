@@ -7,6 +7,12 @@ import { useEffect, useState } from "react";
 import { apiGet } from "../lib/api";
 import { formatCurrency, categoryLabel } from "../lib/format";
 import { tokens } from "../lib/theme";
+import { useLang } from "../lib/i18n";
+
+const T = {
+  es: { thisWeek: "Esta semana" },
+  en: { thisWeek: "This week" },
+} as const;
 
 interface Recap {
   start: string | null;
@@ -17,6 +23,8 @@ interface Recap {
 }
 
 export function WeeklyRecap() {
+  const lang = useLang();
+  const t = T[lang];
   const [recap, setRecap] = useState<Recap | null>(null);
 
   useEffect(() => {
@@ -45,7 +53,7 @@ export function WeeklyRecap() {
           letterSpacing: 0.5,
         }}
       >
-        Esta semana
+        {t.thisWeek}
       </p>
       <p style={{ margin: "4px 0 8px", fontSize: 24, fontWeight: 500 }}>
         {formatCurrency(recap.total, "PEN")}
@@ -53,7 +61,7 @@ export function WeeklyRecap() {
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 10 }}>
         {recap.byCategory.slice(0, 3).map((c) => (
           <span key={c.category} style={{ fontSize: 13, color: tokens.colors.textMuted }}>
-            {categoryLabel(c.category)} {formatCurrency(c.amount, "PEN")}
+            {categoryLabel(c.category, lang)} {formatCurrency(c.amount, "PEN")}
           </span>
         ))}
       </div>
