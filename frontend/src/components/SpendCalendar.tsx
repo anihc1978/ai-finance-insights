@@ -8,9 +8,27 @@
 // month that actually has spend (else the current month). Presentational only —
 // caller passes the raw transactions and the calendar groups them client-side.
 // ---------------------------------------------------------------------------
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tokens } from "../lib/theme";
 import { formatCurrency } from "../lib/format";
+
+// True on phone-width screens. Day cells are only ~40px wide on a phone, far too
+// narrow for a "S/ 1,200.00" label, so on mobile we drop the per-cell amount and
+// rely on the heat colour + the tap tooltip instead.
+function useIsMobile(): boolean {
+  const [m, setM] = useState<boolean>(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 640px)").matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 640px)");
+    const on = () => setM(mql.matches);
+    mql.addEventListener("change", on);
+    return () => mql.removeEventListener("change", on);
+  }, []);
+  return m;
+}
 
 interface SpendCalendarProps {
   transactions: { date: string; amount: number; currency: string }[];
@@ -65,6 +83,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
   const [viewMonth, setViewMonth] = useState<string>(() =>
     initialViewMonth(transactions)
   );
+  const isMobile = useIsMobile();
 
   const [yStr, mStr] = viewMonth.split("-");
   const year = Number(yStr);
@@ -259,8 +278,16 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
               }}
             >
               <span style={{ fontSize: 12, fontWeight: 500 }}>{cell.day}</span>
-              {hasSpend && (
-                <span style={{ fontSize: 11, fontWeight: 500 }}>
+              {hasSpend && !isMobile && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {formatCurrency(cell.spend, "PEN")}
                 </span>
               )}
