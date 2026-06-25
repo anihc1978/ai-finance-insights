@@ -281,41 +281,73 @@ export function Dashboard() {
 
       {error && <p style={{ color: "crimson" }}>Error: {error}</p>}
 
-      {/* Tab bar: overview, suscripciones, budgets, goals. Horizontally
-          scrollable so tabs never wrap or break the layout on a phone. */}
-      <nav
-        style={{
-          display: "flex",
-          flexWrap: "nowrap",
-          gap: 8,
-          marginTop: 24,
-          borderBottom: `1px solid ${tokens.colors.border}`,
-          overflowX: "auto",
-          WebkitOverflowScrolling: "touch",
-        }}
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
+      {/* Section nav: a full-width dropdown on phones (the 5 Spanish labels are
+          too long for a tab row), the classic tab bar on desktop. */}
+      {isMobile ? (
+        <div
+          style={{
+            marginTop: 24,
+            paddingBottom: 12,
+            borderBottom: `1px solid ${tokens.colors.border}`,
+          }}
+        >
+          <select
+            aria-label="Sección"
+            value={tab}
+            onChange={(e) => setTab(e.target.value as Tab)}
             style={{
-              padding: "8px 14px",
-              border: "none",
-              borderBottom:
-                tab === t.id
-                  ? `2px solid ${tokens.colors.accent}`
-                  : "2px solid transparent",
-              background: "none",
-              cursor: "pointer",
-              fontWeight: tab === t.id ? 500 : 400,
-              whiteSpace: "nowrap",
-              color: tab === t.id ? tokens.colors.text : tokens.colors.textMuted,
+              width: "100%",
+              padding: "10px 12px",
+              fontSize: 15,
+              fontWeight: 500,
+              color: tokens.colors.text,
+              background: tokens.colors.cardBg,
+              border: `1px solid ${tokens.colors.border}`,
+              borderRadius: tokens.radii.input,
             }}
           >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+            {TABS.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <nav
+          style={{
+            display: "flex",
+            flexWrap: "nowrap",
+            gap: 8,
+            marginTop: 24,
+            borderBottom: `1px solid ${tokens.colors.border}`,
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                padding: "8px 14px",
+                border: "none",
+                borderBottom:
+                  tab === t.id
+                    ? `2px solid ${tokens.colors.accent}`
+                    : "2px solid transparent",
+                background: "none",
+                cursor: "pointer",
+                fontWeight: tab === t.id ? 500 : 400,
+                whiteSpace: "nowrap",
+                color: tab === t.id ? tokens.colors.text : tokens.colors.textMuted,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {tab === "overview" && (
         <>
