@@ -1,16 +1,18 @@
 // src/components/SpendCalendar.tsx
 // ---------------------------------------------------------------------------
 // Origin-style spend heatmap with month navigation. Each day cell shows the day
-// number plus that day's total SPEND in soles (sum of -amount for PEN rows on
-// that date), shaded as a teal heatmap — more spend = stronger fill. Empty days
-// stay faint. Weekday-aligned (Lun..Dom), with the Spanish month name + total.
-// The viewed month is navigable with ‹ / › chevrons; it seeds from the latest
-// month that actually has spend (else the current month). Presentational only —
-// caller passes the raw transactions and the calendar groups them client-side.
+// number plus that day's total SPEND in the display currency (sum of -amount for
+// rows in that currency on that date), shaded as a teal heatmap — more spend =
+// stronger fill. Empty days stay faint. Weekday-aligned (Lun..Dom), with the
+// month name + total. The viewed month is navigable with ‹ / › chevrons; it
+// seeds from the latest month that actually has spend (else the current month).
+// Amounts are never converted — the calendar only sums rows already in the
+// display currency. Presentational only — caller passes the raw transactions
+// and the calendar groups them client-side.
 // ---------------------------------------------------------------------------
 import { useEffect, useState } from "react";
 import { tokens } from "../lib/theme";
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, type Currency } from "../lib/format";
 import { useLang } from "../lib/i18n";
 
 const T = {
@@ -80,6 +82,10 @@ function useIsMobile(): boolean {
 
 interface SpendCalendarProps {
   transactions: { date: string; amount: number; currency: string }[];
+  // Which currency's spend to chart. Defaults to PEN so existing callers keep
+  // their soles view; the Dashboard passes the user's display currency so a EUR
+  // user sees their euro spend. Amounts are never converted across currencies.
+  displayCurrency?: Currency;
 }
 
 // JS getDay(): 0=Sun..6=Sat. We want Monday-first (0=Mon..6=Sun) so the grid
@@ -93,13 +99,15 @@ function monthKey(year: number, month0: number): string {
   return `${year}-${String(month0 + 1).padStart(2, "0")}`;
 }
 
-// Latest "YYYY-MM" among PEN spend rows, else the current month.
+// Latest "YYYY-MM" among spend rows in the display currency, else the current
+// month.
 function initialViewMonth(
-  transactions: SpendCalendarProps["transactions"]
+  transactions: SpendCalendarProps["transactions"],
+  displayCurrency: Currency
 ): string {
   let latest = "";
   for (const t of transactions) {
-    if (t.currency !== "PEN") continue;
+    if (t.currency !== displayCurrency) continue;
     if (Number(t.amount) >= 0) continue; // income/transfers in — not spend
     const ym = t.date.slice(0, 7); // "YYYY-MM"
     if (ym.length === 7 && ym > latest) latest = ym;
@@ -109,10 +117,13 @@ function initialViewMonth(
   return monthKey(now.getFullYear(), now.getMonth());
 }
 
-export function SpendCalendar({ transactions }: SpendCalendarProps) {
+export function SpendCalendar({
+  transactions,
+  displayCurrency = "PEN",
+}: SpendCalendarProps) {
   const t = T[useLang()];
   const [viewMonth, setViewMonth] = useState<string>(() =>
-    initialViewMonth(transactions)
+    initialViewMonth(transactions, displayCurrency)
   );
   const isMobile = useIsMobile();
   // On phones the calendar grid is tall, so it starts collapsed — tap to expand.
@@ -135,12 +146,12 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
   // How many blank cells before day 1 so the 1st sits under its weekday.
   const leadingBlanks = mondayIndex(new Date(year, month, 1).getDay());
 
-  // Sum spend (positive number of soles) per day-of-month for PEN rows in the
-  // viewed month. amount is negative for spend, so we negate and keep only the
-  // outflows.
+  // Sum spend (positive amount in the display currency) per day-of-month for
+  // rows in that currency in the viewed month. amount is negative for spend, so
+  // we negate and keep only the outflows.
   const spendByDay: Record<number, number> = {};
   for (const t of transactions) {
-    if (t.currency !== "PEN") continue;
+    if (t.currency !== displayCurrency) continue;
     const amount = Number(t.amount);
     if (amount >= 0) continue; // income/transfers in — not spend
     // Parse "YYYY-MM-DD" without timezone drift.
@@ -240,7 +251,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
               whiteSpace: "nowrap",
             }}
           >
-            {formatCurrency(monthTotal, "PEN")} ›
+            {formatCurrency(monthTotal, displayCurrency)} ›
           </span>
         </button>
       ) : (
@@ -288,7 +299,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: tokens.spacing.sm }}>
               <span style={{ fontSize: 14, fontWeight: 500, color: tokens.colors.accent }}>
-                {formatCurrency(monthTotal, "PEN")}
+                {formatCurrency(monthTotal, displayCurrency)}
               </span>
               {isMobile && (
                 <button
@@ -348,7 +359,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
                   onClick={() => setSelectedDay(cell.day)}
                   title={
                     hasSpend
-                      ? `${cell.day}: ${formatCurrency(cell.spend, "PEN")}`
+                      ? `${cell.day}: ${formatCurrency(cell.spend, displayCurrency)}`
                       : `${cell.day}: ${t.noSpending}`
                   }
                   style={{
@@ -377,7 +388,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {formatCurrency(cell.spend, "PEN")}
+                      {formatCurrency(cell.spend, displayCurrency)}
                     </span>
                   )}
                 </div>
@@ -395,7 +406,7 @@ export function SpendCalendar({ transactions }: SpendCalendarProps) {
               </strong>
               {": "}
               {spendByDay[selectedDay]
-                ? formatCurrency(spendByDay[selectedDay], "PEN")
+                ? formatCurrency(spendByDay[selectedDay], displayCurrency)
                 : t.noSpending}
             </div>
           )}

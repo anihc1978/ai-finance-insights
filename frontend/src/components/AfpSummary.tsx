@@ -52,7 +52,6 @@ const T = {
   es: {
     verDetalle: "Ver detalle de AFP",
     ver: "Ver →",
-    ejemplo: "ejemplo",
     mes: "Mes",
     aporte: "Aporte",
     saldo: "Saldo",
@@ -66,7 +65,6 @@ const T = {
   en: {
     verDetalle: "View AFP detail",
     ver: "View →",
-    ejemplo: "example",
     mes: "Month",
     aporte: "Contribution",
     saldo: "Balance",
@@ -78,18 +76,6 @@ const T = {
     cerrar: "Close",
   },
 } as const;
-
-// Example "AFP Integra" monthly aporte + saldo (mirrors the full panel's sample)
-// shown when there are no real records, so the card previews a month-by-month
-// table instead of a big empty space below the total.
-const EXAMPLE_MONTHS: { as_of: string; aporte: number; balance: number }[] = [
-  { as_of: "2026-01-31", aporte: 430, balance: 12540 },
-  { as_of: "2026-02-28", aporte: 430, balance: 13180 },
-  { as_of: "2026-03-31", aporte: 430, balance: 13690 },
-  { as_of: "2026-04-30", aporte: 430, balance: 14420 },
-  { as_of: "2026-05-31", aporte: 430, balance: 15010 },
-  { as_of: "2026-06-30", aporte: 430, balance: 15640 },
-];
 
 export function AfpSummary({ currency }: AfpSummaryProps) {
   const lang = useLang();
@@ -127,20 +113,14 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
   }
 
   const hasData = latest != null;
-  // When there are no real records, show the same "AFP Integra" example total
-  // the full panel falls back to, tagged "ejemplo", instead of a bare empty
-  // state — so the dashboard card isn't empty before the first real entry.
-  const EXAMPLE_TOTAL = 15640;
-  const showExample = loaded && !hasData;
   // Preview table below the total (Mes | Aporte | Saldo | Variación), last 3
   // months. Variación = saldo − saldo del mes anterior (computed over the full
-  // series, then sliced). Aporte only exists in the example; real records don't
-  // carry it, so it shows "—".
+  // series, then sliced). Aporte isn't carried by real records, so it shows "—".
+  // When there are no real records we render nothing here — just the friendly
+  // "add your AFP" prompt below.
   const fullSeries: { as_of: string; aporte: number | null; balance: number }[] =
     hasData
       ? records.map((r) => ({ as_of: r.as_of, aporte: null, balance: r.balance }))
-      : showExample
-      ? EXAMPLE_MONTHS.map((r) => ({ ...r }))
       : [];
   const monthRows = fullSeries
     .map((r, i) => ({
@@ -184,18 +164,15 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
         >
           <span style={{ fontSize: 13, color: tokens.colors.textMuted }}>
             AFP
-            {hasData && latest.afp_name
-              ? ` · ${latest.afp_name}`
-              : showExample
-              ? " · Integra"
-              : ""}
+            {hasData && latest.afp_name ? ` · ${latest.afp_name}` : ""}
           </span>
           <span style={{ fontSize: 13, color: tokens.colors.accent }}>{t.ver}</span>
         </div>
 
         {loaded ? (
+          hasData ? (
           <>
-            {/* Total balance (real latest, or the Integra example). */}
+            {/* Total balance (real latest). */}
             <div
               style={{
                 marginTop: 4,
@@ -206,23 +183,8 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
               }}
             >
               <span style={{ fontSize: 22, fontWeight: 600, color: tokens.colors.text }}>
-                {formatCurrency(latest ? latest.balance : EXAMPLE_TOTAL, currency)}
+                {formatCurrency(latest.balance, currency)}
               </span>
-              {showExample && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 500,
-                    color: tokens.colors.accent,
-                    background: tokens.colors.surface,
-                    border: `1px solid ${tokens.colors.border}`,
-                    borderRadius: tokens.radii.chip,
-                    padding: "2px 8px",
-                  }}
-                >
-                  {t.ejemplo}
-                </span>
-              )}
             </div>
 
             {/* Preview table (Mes | Aporte | Saldo | Variación) so the card
@@ -283,11 +245,16 @@ export function AfpSummary({ currency }: AfpSummaryProps) {
             )}
 
             <div style={{ marginTop: 8, fontSize: 12, color: tokens.colors.textMuted }}>
-              {latest
-                ? `${t.saldoAl} ${latest.as_of}`
-                : t.agrega}
+              {`${t.saldoAl} ${latest.as_of}`}
             </div>
           </>
+          ) : (
+            /* No real records yet — show only the friendly add/scan prompt,
+               no example total and no sample table. */
+            <div style={{ marginTop: 4, fontSize: 13, color: tokens.colors.textMuted }}>
+              {t.agrega}
+            </div>
+          )
         ) : (
           <div style={{ marginTop: 4, fontSize: 13, color: tokens.colors.textMuted }}>
             {t.loading}

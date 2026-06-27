@@ -21,7 +21,7 @@ import {
 import { apiGet, apiPost, apiDelete, apiUpload } from "../lib/api";
 import { formatCurrency, type Currency } from "../lib/format";
 import { tokens } from "../lib/theme";
-import { useLang, type Lang } from "../lib/i18n";
+import { useLang } from "../lib/i18n";
 
 interface AfpPanelProps {
   currency: Currency;
@@ -32,14 +32,6 @@ const T = {
     saldoActual: "Saldo actual",
     fondo: "Fondo",
     al: "al",
-    afpIntegra: "AFP Integra",
-    ejemploMuestra: "Ejemplo — datos de muestra",
-    asiSeVera:
-      "Así se verá tu AFP. Escanea o ingresa tu estado de cuenta abajo para reemplazarlo con tus números reales.",
-    mes: "Mes",
-    aporte: "Aporte",
-    saldo: "Saldo",
-    variacion: "Variación",
     saldoEnTiempo: "Saldo en el tiempo",
     agregaDos: "Agrega al menos dos registros para ver la evolución.",
     escanearEstado: "Escanear estado de cuenta",
@@ -74,14 +66,6 @@ const T = {
     saldoActual: "Current balance",
     fondo: "Fund",
     al: "as of",
-    afpIntegra: "AFP Integra",
-    ejemploMuestra: "Example — sample data",
-    asiSeVera:
-      "This is how your AFP will look. Scan or enter your statement below to replace it with your real numbers.",
-    mes: "Month",
-    aporte: "Contribution",
-    saldo: "Balance",
-    variacion: "Change",
     saldoEnTiempo: "Balance over time",
     agregaDos: "Add at least two records to see the trend.",
     escanearEstado: "Scan statement",
@@ -151,33 +135,6 @@ const EMPTY_FORM: AfpForm = {
   afp_name: "",
 };
 
-// Example "AFP Integra" data shown ONLY when the user has no real records yet,
-// so the panel isn't empty before they scan/enter their first statement. These
-// are sample numbers — never saved to the backend. The moment a real record
-// exists, this is dropped and the panel behaves exactly as before.
-const EXAMPLE_RECORDS: AfpRecord[] = [
-  { id: "ex-1", as_of: "2026-01-31", balance: 12540, fund_type: null, contributed: 430, afp_name: "Integra", source: "example" },
-  { id: "ex-2", as_of: "2026-02-28", balance: 13180, fund_type: null, contributed: 430, afp_name: "Integra", source: "example" },
-  { id: "ex-3", as_of: "2026-03-31", balance: 13690, fund_type: null, contributed: 430, afp_name: "Integra", source: "example" },
-  { id: "ex-4", as_of: "2026-04-30", balance: 14420, fund_type: null, contributed: 430, afp_name: "Integra", source: "example" },
-  { id: "ex-5", as_of: "2026-05-31", balance: 15010, fund_type: null, contributed: 430, afp_name: "Integra", source: "example" },
-  { id: "ex-6", as_of: "2026-06-30", balance: 15640, fund_type: null, contributed: 430, afp_name: "Integra", source: "example" },
-];
-
-// "2026-01-31" → "Ene 2026" (es) / "Jan 2026" (en), short month, capitalised.
-function monthLabel(asOf: string, lang: Lang): string {
-  const [year, m] = asOf.split("-").map(Number);
-  if (!year || !m) return asOf;
-  const label = new Date(year, m - 1, 1).toLocaleDateString(
-    lang === "en" ? "en-US" : "es-PE",
-    {
-      month: "short",
-      year: "numeric",
-    },
-  );
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
 const cardStyle: React.CSSProperties = {
   background: tokens.colors.cardBg,
   border: `1px solid ${tokens.colors.border}`,
@@ -203,7 +160,6 @@ export function AfpPanel({ currency }: AfpPanelProps) {
   const lang = useLang();
   const t = T[lang];
   const [records, setRecords] = useState<AfpRecord[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -214,12 +170,8 @@ export function AfpPanel({ currency }: AfpPanelProps) {
   const [fromScan, setFromScan] = useState(false);
 
   async function loadRecords() {
-    try {
-      const data = await apiGet<{ records: AfpRecord[] }>("/afp");
-      setRecords(data.records);
-    } finally {
-      setLoaded(true);
-    }
+    const data = await apiGet<{ records: AfpRecord[] }>("/afp");
+    setRecords(data.records);
   }
 
   useEffect(() => {
@@ -312,19 +264,9 @@ export function AfpPanel({ currency }: AfpPanelProps) {
     }
   }
 
-  // No real records yet (after the fetch settled) → fall back to a clearly
-  // labelled "AFP Integra" example so the panel isn't empty. The moment a real
-  // record exists this is dropped and everything behaves exactly as before.
-  const showExample = loaded && records.length === 0;
-
-  // Rows that drive the latest-balance card and the chart: real records, or the
-  // example set when there are none.
-  const displayRecords = showExample ? EXAMPLE_RECORDS : records;
-
   // Ordered by as_of asc, so the last row is the latest.
-  const latest =
-    displayRecords.length > 0 ? displayRecords[displayRecords.length - 1] : null;
-  const chartData = displayRecords.map((r) => ({ as_of: r.as_of, balance: r.balance }));
+  const latest = records.length > 0 ? records[records.length - 1] : null;
+  const chartData = records.map((r) => ({ as_of: r.as_of, balance: r.balance }));
 
   return (
     <div>
@@ -347,131 +289,6 @@ export function AfpPanel({ currency }: AfpPanelProps) {
           <p style={{ margin: "4px 0 0", color: tokens.colors.textMuted, fontSize: 13 }}>
             {latest.fund_type ? `${t.fondo}: ${latest.fund_type} · ` : ""}{t.al} {latest.as_of}
           </p>
-        </section>
-      )}
-
-      {/* Example "AFP Integra" table — only when there are no real records yet.
-          Clearly labelled as sample data; replaced the moment a real record
-          exists. The scan/manual CTAs below still let the user enter real data. */}
-      {showExample && (
-        <section style={cardStyle}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              gap: tokens.spacing.sm,
-              flexWrap: "wrap",
-            }}
-          >
-            <h3 style={sectionTitle}>{t.afpIntegra}</h3>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                color: tokens.colors.accent,
-                background: tokens.colors.surface,
-                border: `1px solid ${tokens.colors.border}`,
-                borderRadius: tokens.radii.chip,
-                padding: "2px 8px",
-              }}
-            >
-              {t.ejemploMuestra}
-            </span>
-          </div>
-          <p style={{ color: tokens.colors.textMuted, fontSize: 13, marginTop: 4 }}>
-            {t.asiSeVera}
-          </p>
-          <div style={{ overflowX: "auto", marginTop: 12 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr>
-                  {[t.mes, t.aporte, t.saldo, t.variacion].map((h, i) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: i === 0 ? "left" : "right",
-                        padding: "6px 8px",
-                        color: tokens.colors.textMuted,
-                        fontWeight: 500,
-                        borderBottom: `1px solid ${tokens.colors.border}`,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {EXAMPLE_RECORDS.map((r, i) => {
-                  const prev = i > 0 ? EXAMPLE_RECORDS[i - 1].balance : null;
-                  const variation = prev != null ? r.balance - prev : null;
-                  return (
-                    <tr key={r.id}>
-                      <td
-                        style={{
-                          textAlign: "left",
-                          padding: "6px 8px",
-                          color: tokens.colors.text,
-                          borderBottom: `1px solid ${tokens.colors.border}`,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {monthLabel(r.as_of, lang)}
-                      </td>
-                      <td
-                        style={{
-                          textAlign: "right",
-                          padding: "6px 8px",
-                          color: tokens.colors.textMuted,
-                          borderBottom: `1px solid ${tokens.colors.border}`,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {r.contributed != null
-                          ? formatCurrency(r.contributed, currency)
-                          : "—"}
-                      </td>
-                      <td
-                        style={{
-                          textAlign: "right",
-                          padding: "6px 8px",
-                          color: tokens.colors.text,
-                          fontWeight: 500,
-                          borderBottom: `1px solid ${tokens.colors.border}`,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {formatCurrency(r.balance, currency)}
-                      </td>
-                      <td
-                        style={{
-                          textAlign: "right",
-                          padding: "6px 8px",
-                          color:
-                            variation == null
-                              ? tokens.colors.textMuted
-                              : variation >= 0
-                              ? tokens.colors.up
-                              : tokens.colors.down,
-                          borderBottom: `1px solid ${tokens.colors.border}`,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {variation == null
-                          ? "—"
-                          : `${variation >= 0 ? "+" : "−"}${formatCurrency(
-                              Math.abs(variation),
-                              currency,
-                            )}`}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         </section>
       )}
 

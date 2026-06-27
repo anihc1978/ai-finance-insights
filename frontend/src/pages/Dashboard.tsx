@@ -42,6 +42,7 @@ import { LanguageToggle } from "../components/LanguageToggle";
 import { tokens } from "../lib/theme";
 import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 import { useLang } from "../lib/i18n";
+import { useDisplayCurrency, DISPLAY_CURRENCIES } from "../lib/displayCurrency";
 
 // The currency a transaction is denominated in (mirrors the backend column).
 type TxnCurrency = "PEN" | "USD" | "EUR";
@@ -108,10 +109,14 @@ export function Dashboard() {
   const [recategorizing, setRecategorizing] = useState(false);
   // How many movements the list shows before the "Ver más" button (10 at a time).
   const [visibleCount, setVisibleCount] = useState(10);
-  // Display currency is fixed to soles (S/). We don't offer a global toggle —
-  // it only relabelled amounts (S/100 -> "$100") without converting, which was
-  // misleading. Each row still shows in its own currency via t.currency.
-  const currency: Currency = "PEN";
+  // Display currency: the single currency the roll-up totals (KPIs, charts,
+  // calendar, wallet emphasis) are computed/labelled in. Defaults to the user's
+  // most-common transaction currency (so a Peru user sees S/, a Spain user €),
+  // with an explicit override they can pick below. This NEVER converts amounts —
+  // it only chooses which currency the single-number totals report in, which is
+  // correct for the common single-currency user. Per-row amounts keep their own
+  // currency (rendered via txn.currency in the table).
+  const [currency, setCurrency] = useDisplayCurrency(txns);
   // Which currency the next CSV import is denominated in (PEN by default,
   // matching the backend column default). Separate from the display currency.
   const [importCurrency, setImportCurrency] = useState<TxnCurrency>("PEN");
@@ -245,6 +250,9 @@ export function Dashboard() {
     .reduce((sum, t) => sum + Number(t.amount), 0);
   const usdTotal = txns
     .filter((t) => t.currency === "USD")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const eurTotal = txns
+    .filter((t) => t.currency === "EUR")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   // "Ingresos por fuente": group positive movements by their source key (skip
@@ -500,6 +508,49 @@ export function Dashboard() {
           {/* KPI metric cards: Spent / Income / Saved / Forecast. Only shown
               once the backend has data to analyze. */}
           {insights && (
+            <>
+            {/* Display-currency override: which currency the totals below are
+                shown in. Defaults to the user's most-common transaction
+                currency; this only relabels the single-number roll-ups (no
+                conversion). Discreet, right-aligned above the KPI cards. */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 6,
+                marginTop: tokens.spacing.lg,
+                fontSize: 13,
+                color: tokens.colors.textMuted,
+              }}
+            >
+              <label
+                htmlFor="display-currency"
+                style={{ display: "flex", gap: 6, alignItems: "center" }}
+              >
+                {t.showIn}:
+                <select
+                  id="display-currency"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value as Currency)}
+                  aria-label={t.displayCurrencyAria}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: 13,
+                    borderRadius: 6,
+                    border: `1px solid ${tokens.colors.border}`,
+                    background: tokens.colors.cardBg,
+                    color: tokens.colors.text,
+                  }}
+                >
+                  {DISPLAY_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {DISPLAY_CURRENCY_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <div
               style={{
                 display: "grid",
@@ -507,7 +558,7 @@ export function Dashboard() {
                   ? "1fr 1fr"
                   : "repeat(auto-fit, minmax(160px, 1fr))",
                 gap: tokens.spacing.md,
-                marginTop: tokens.spacing.lg,
+                marginTop: tokens.spacing.md,
               }}
             >
               <KpiCard
@@ -542,6 +593,7 @@ export function Dashboard() {
                 value={formatCurrency(insights.forecastNextMonth, currency)}
               />
             </div>
+            </>
           )}
 
           <section style={{ marginTop: 16 }}>
@@ -550,7 +602,12 @@ export function Dashboard() {
 
           {/* Tus billeteras — directly after Esta semana, same section treatment. */}
           <section style={{ marginTop: 16 }}>
-            <WalletSplit pen={penTotal} usd={usdTotal} currency={currency} />
+            <WalletSplit
+              pen={penTotal}
+              usd={usdTotal}
+              eur={eurTotal}
+              currency={currency}
+            />
           </section>
 
           {/* Yape y Plin: total moved through each digital wallet — the running
@@ -680,8 +737,9 @@ export function Dashboard() {
             <AfpSummary currency={currency} />
           </section>
 
-          {/* Origin-style spend heatmap for the current month (soles). */}
-          <SpendCalendar transactions={txns} />
+          {/* Origin-style spend heatmap for the current month, in the display
+              currency (so a EUR user sees their euro spend). */}
+          <SpendCalendar transactions={txns} displayCurrency={currency} />
 
           {/* AI insight panels — only shown once the backend has data to analyze. */}
           {insights && (
@@ -961,6 +1019,15 @@ function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
   );
 }
 
+// Symbol-annotated labels for the display-currency selector, so the option text
+// reads "PEN (S/)" / "USD (US$)" / "EUR (€)" like the import-currency dropdown.
+const DISPLAY_CURRENCY_LABELS: Record<Currency, string> = {
+  PEN: "PEN (S/)",
+  USD: "USD (US$)",
+  EUR: "EUR (€)",
+  AUD: "AUD (A$)",
+};
+
 // Tab definitions, kept module-level so the render loop stays declarative. The
 // labels come from the active language's strings (passed in) so the bar
 // translates without restructuring the loop.
@@ -1022,6 +1089,8 @@ const T = {
     thActions: "Acciones",
     seeMoreTransactions: "Ver más movimientos",
     remaining: (n: number) => `${n} restantes`,
+    showIn: "Mostrar en",
+    displayCurrencyAria: "Moneda a mostrar",
   },
   en: {
     signOut: "Sign out",
@@ -1067,5 +1136,7 @@ const T = {
     thActions: "Actions",
     seeMoreTransactions: "See more transactions",
     remaining: (n: number) => `${n} remaining`,
+    showIn: "Show in",
+    displayCurrencyAria: "Display currency",
   },
 } as const;
