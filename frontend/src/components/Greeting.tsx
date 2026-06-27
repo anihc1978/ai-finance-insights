@@ -1,8 +1,8 @@
 // src/components/Greeting.tsx
 // ---------------------------------------------------------------------------
-// A personal, time-aware header: "Buenos días, Eduardo". The name comes from
-// localStorage (editable) and defaults to "Eduardo" so it feels personal from
-// the first load.
+// A personal, time-aware header: "Buenos días, <name>". The name comes from
+// localStorage (editable). It starts EMPTY so a new person sees just the
+// greeting and fills in their own name via "Editar".
 // ---------------------------------------------------------------------------
 import { useState } from "react";
 import { tokens } from "../lib/theme";
@@ -41,7 +41,7 @@ export function Greeting() {
   const lang = useLang();
   const t = T[lang];
   const [name, setName] = useState<string>(
-    () => localStorage.getItem("fin_nombre") ?? "Eduardo",
+    () => localStorage.getItem("fin_nombre") ?? "",
   );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);

@@ -111,10 +111,15 @@ drop policy if exists "own goals - all" on public.goals;
 create policy "own goals - all" on public.goals for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- ---- dual-currency: tag each transaction PEN or USD (Peru runs both) ---------
+-- ---- multi-currency: tag each transaction PEN / USD / EUR --------------------
 alter table public.transactions
-  add column if not exists currency text not null default 'PEN'
-  check (currency in ('PEN','USD'));
+  add column if not exists currency text not null default 'PEN';
+
+-- Allowed currencies. Re-runnable: drop + re-add the check so existing databases
+-- (where the currency column already exists) pick up EUR too.
+alter table public.transactions drop constraint if exists transactions_currency_check;
+alter table public.transactions
+  add constraint transactions_currency_check check (currency in ('PEN','USD','EUR'));
 
 -- ---- afp_records: track AFP (Peru private pension) balance over time ---------
 create table if not exists public.afp_records (

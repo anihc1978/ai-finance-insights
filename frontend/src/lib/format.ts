@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 /** The currencies the app can display money in (mirrors the backend's SUPPORTED_CURRENCIES). */
-export type Currency = "USD" | "AUD" | "PEN";
+export type Currency = "USD" | "AUD" | "PEN" | "EUR";
 
 // Each currency formats with its own locale so separators/symbol placement look
 // native: USD en-US, AUD en-AU, PEN es-PE. Intl.NumberFormat also handles
@@ -24,6 +24,11 @@ const FORMATTERS: Record<Currency, Intl.NumberFormat> = {
   PEN: new Intl.NumberFormat("es-PE", {
     style: "currency",
     currency: "PEN",
+    maximumFractionDigits: 2,
+  }),
+  EUR: new Intl.NumberFormat("en-IE", {
+    style: "currency",
+    currency: "EUR",
     maximumFractionDigits: 2,
   }),
 };

@@ -130,7 +130,7 @@ async def import_transactions(
     An optional `source` tags the whole statement (e.g. "bcp", "yape") so every
     row's `raw.source_key` lets detect_source label it with a brand chip.
     """
-    currency = currency if currency in ("PEN", "USD") else "PEN"
+    currency = currency if currency in ("PEN", "USD", "EUR") else "PEN"
 
     contents = await file.read()  # raw bytes of the uploaded CSV
     try:
@@ -202,7 +202,7 @@ def create_transaction(body: TransactionBody, user: CurrentUser = Depends(get_cu
     Currency is coerced to PEN unless USD is explicitly given, matching the import
     route, so a bad value can never write an invalid currency.
     """
-    currency = body.currency if body.currency == "USD" else "PEN"
+    currency = body.currency if body.currency in ("USD", "EUR") else "PEN"
     res = (
         user_client(user.token)
         .table("transactions")
@@ -231,7 +231,7 @@ def update_transaction(
     """Update any of a transaction's editable fields. 404 if it doesn't exist."""
     updates = body.model_dump(exclude_unset=True)
     if "currency" in updates:
-        updates["currency"] = updates["currency"] if updates["currency"] == "USD" else "PEN"
+        updates["currency"] = updates["currency"] if updates["currency"] in ("USD", "EUR") else "PEN"
     if not updates:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

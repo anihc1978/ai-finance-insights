@@ -44,7 +44,7 @@ import { formatCurrency, categoryLabel, type Currency } from "../lib/format";
 import { useLang } from "../lib/i18n";
 
 // The currency a transaction is denominated in (mirrors the backend column).
-type TxnCurrency = "PEN" | "USD";
+type TxnCurrency = "PEN" | "USD" | "EUR";
 
 // The shape of a transaction row coming back from GET /transactions.
 // `currency` is the dual-currency tag added by the Peru FX suite.
@@ -386,6 +386,117 @@ export function Dashboard() {
             <ChatAssistant />
           </section>
 
+          {/* Import + scan, on top so a new (empty) user can add data right away. */}
+          <section
+            style={{
+              marginTop: 24,
+              padding: tokens.spacing.lg,
+              background: tokens.colors.surface,
+              border: `1px solid ${tokens.colors.border}`,
+              borderRadius: tokens.radii.card,
+            }}
+          >
+            <h3 style={{ marginTop: 0, fontWeight: 500 }}>{t.importTransactions}</h3>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFile}
+                disabled={importing}
+              />
+              <label
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 13,
+                  color: tokens.colors.textMuted,
+                }}
+              >
+                {t.currencyLabel}
+                <select
+                  value={importCurrency}
+                  onChange={(e) =>
+                    setImportCurrency(e.target.value as TxnCurrency)
+                  }
+                  aria-label={t.importCurrencyAria}
+                  style={{
+                    padding: "6px 8px",
+                    fontSize: 14,
+                    borderRadius: 6,
+                    border: `1px solid ${tokens.colors.border}`,
+                    background: "white",
+                  }}
+                >
+                  <option value="PEN">PEN (S/)</option>
+                  <option value="USD">USD (US$)</option>
+                  <option value="EUR">EUR (€)</option>
+                </select>
+              </label>
+              <label
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "center",
+                  fontSize: 13,
+                  color: tokens.colors.textMuted,
+                }}
+              >
+                {t.sourceLabel}
+                <select
+                  value={importSource}
+                  onChange={(e) => setImportSource(e.target.value)}
+                  aria-label={t.importSourceAria}
+                  style={{
+                    padding: "6px 8px",
+                    fontSize: 14,
+                    borderRadius: 6,
+                    border: `1px solid ${tokens.colors.border}`,
+                    background: "white",
+                  }}
+                >
+                  <option value="">{t.unspecified}</option>
+                  {Object.entries(SOURCE_CHIPS).map(([key, chip]) => (
+                    <option key={key} value={key}>
+                      {chip.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {importing && <span>{t.importingWithAI}</span>}
+            </div>
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={handleCategorize} disabled={categorizing || recategorizing}>
+                {categorizing ? t.categorizing : t.categorizeWithAI}
+              </button>
+              <button
+                onClick={handleRecategorize}
+                disabled={categorizing || recategorizing}
+                title="Relabel old movements stuck in 'Otros'"
+              >
+                {recategorizing ? t.recategorizing : t.recategorizeAll}
+              </button>
+            </div>
+
+            {/* Scan Yape/Plin receipt screenshots → AI extracts transactions. */}
+            <div
+              style={{
+                marginTop: tokens.spacing.lg,
+                paddingTop: tokens.spacing.lg,
+                borderTop: `1px solid ${tokens.colors.border}`,
+              }}
+            >
+              <ReceiptScanner onImported={loadTransactions} />
+            </div>
+          </section>
+
           {/* KPI metric cards: Spent / Income / Saved / Forecast. Only shown
               once the backend has data to analyze. */}
           {insights && (
@@ -599,116 +710,6 @@ export function Dashboard() {
               />
             </>
           )}
-
-          {/* Import — dual-currency aware: the picker tags the next upload. */}
-          <section
-            style={{
-              marginTop: 24,
-              padding: tokens.spacing.lg,
-              background: tokens.colors.surface,
-              border: `1px solid ${tokens.colors.border}`,
-              borderRadius: tokens.radii.card,
-            }}
-          >
-            <h3 style={{ marginTop: 0, fontWeight: 500 }}>{t.importTransactions}</h3>
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFile}
-                disabled={importing}
-              />
-              <label
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  alignItems: "center",
-                  fontSize: 13,
-                  color: tokens.colors.textMuted,
-                }}
-              >
-                {t.currencyLabel}
-                <select
-                  value={importCurrency}
-                  onChange={(e) =>
-                    setImportCurrency(e.target.value as TxnCurrency)
-                  }
-                  aria-label={t.importCurrencyAria}
-                  style={{
-                    padding: "6px 8px",
-                    fontSize: 14,
-                    borderRadius: 6,
-                    border: `1px solid ${tokens.colors.border}`,
-                    background: "white",
-                  }}
-                >
-                  <option value="PEN">PEN (S/)</option>
-                  <option value="USD">USD (US$)</option>
-                </select>
-              </label>
-              <label
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  alignItems: "center",
-                  fontSize: 13,
-                  color: tokens.colors.textMuted,
-                }}
-              >
-                {t.sourceLabel}
-                <select
-                  value={importSource}
-                  onChange={(e) => setImportSource(e.target.value)}
-                  aria-label={t.importSourceAria}
-                  style={{
-                    padding: "6px 8px",
-                    fontSize: 14,
-                    borderRadius: 6,
-                    border: `1px solid ${tokens.colors.border}`,
-                    background: "white",
-                  }}
-                >
-                  <option value="">{t.unspecified}</option>
-                  {Object.entries(SOURCE_CHIPS).map(([key, chip]) => (
-                    <option key={key} value={key}>
-                      {chip.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {importing && <span>{t.importingWithAI}</span>}
-            </div>
-            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={handleCategorize} disabled={categorizing || recategorizing}>
-                {categorizing ? t.categorizing : t.categorizeWithAI}
-              </button>
-              <button
-                onClick={handleRecategorize}
-                disabled={categorizing || recategorizing}
-                title="Relabel old movements stuck in 'Otros'"
-              >
-                {recategorizing ? t.recategorizing : t.recategorizeAll}
-              </button>
-            </div>
-
-            {/* Scan Yape/Plin receipt screenshots → AI extracts transactions. */}
-            <div
-              style={{
-                marginTop: tokens.spacing.lg,
-                paddingTop: tokens.spacing.lg,
-                borderTop: `1px solid ${tokens.colors.border}`,
-              }}
-            >
-              <ReceiptScanner onImported={loadTransactions} />
-            </div>
-          </section>
 
           <section style={{ marginTop: 24 }}>
             <div
@@ -941,6 +942,7 @@ export function Dashboard() {
 // transactions table stays self-contained.
 function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
   const isPen = currency === "PEN";
+  const symbol = currency === "PEN" ? "S/" : currency === "EUR" ? "€" : "US$";
   return (
     <span
       style={{
@@ -954,7 +956,7 @@ function CurrencyBadge({ currency }: { currency: TxnCurrency }) {
         border: `1px solid ${tokens.colors.border}`,
       }}
     >
-      {isPen ? "S/" : "US$"}
+      {symbol}
     </span>
   );
 }

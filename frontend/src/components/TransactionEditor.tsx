@@ -49,7 +49,7 @@ const T = {
   },
 } as const;
 
-type TxnCurrency = "PEN" | "USD";
+type TxnCurrency = "PEN" | "USD" | "EUR";
 
 interface TransactionInitial {
   id?: string;
@@ -273,6 +273,7 @@ export function TransactionEditor({
               >
                 <option value="PEN">PEN (S/)</option>
                 <option value="USD">USD (US$)</option>
+                <option value="EUR">EUR (€)</option>
               </select>
             </div>
           </div>
