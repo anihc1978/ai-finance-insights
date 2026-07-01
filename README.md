@@ -1,137 +1,111 @@
-# 💰 AI Finance Insights
+# AI Finance Insights
 
-> Upload a bank-statement CSV → Claude categorizes every transaction, charts where your money goes, writes a plain-English summary with anomaly flags, and forecasts next month's spend.
+**An AI-powered personal-finance app built for how Peruvians actually manage money** — soles (S/), Yape/Plin transfers, AFP pension tracking, and a live USD/PEN exchange rate — with a bilingual Claude assistant that answers in the user's own language.
 
-A full-stack, multi-user GenAI web app: a **React (Vite + TypeScript)** single-page app talking to a **FastAPI (Python)** backend, with **Supabase (Postgres + Auth)** and per-user **Row-Level Security**, powered by **Anthropic Claude**.
+🔗 **Live demo:** [ai-finance-insights.netlify.app](https://ai-finance-insights.netlify.app) &nbsp;·&nbsp; _(private beta — invite only)_
 
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
-![Python](https://img.shields.io/badge/Python_3.12-3776AB?logo=python&logoColor=white)
-![React](https://img.shields.io/badge/React_18-20232A?logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?logo=supabase&logoColor=white)
-![Claude](https://img.shields.io/badge/Anthropic_Claude-D97757?logo=anthropic&logoColor=white)
-
----
-
-## ✨ Features
-
-- **CSV import** — drop in a bank/credit-card export; transactions are parsed and stored per user.
-- **AI categorization** — one batched **Claude Haiku** call labels every transaction (Groceries, Dining, Subscriptions, …).
-- **Insightful dashboard** — spend-by-category and month-over-month charts (Recharts).
-- **AI narrative + flags** — **Claude Sonnet** writes a plain-English monthly summary and flags anomalies and likely subscriptions.
-- **Next-month forecast** — a pure-Python, recency-weighted projection of upcoming spend.
-- **Secure by design** — Supabase Auth (JWT verified via JWKS) + Postgres **Row-Level Security**, so every row is scoped to its owner at the database layer.
-
-## 📸 Screenshots
-
-> _Add your own captures to `docs/` and they'll render here._
-
-| Dashboard | AI Insights |
-|---|---|
-| `docs/dashboard.png` | `docs/insights.png` |
+![Stack](https://img.shields.io/badge/FastAPI-Python%203.12-009688)
+![Frontend](https://img.shields.io/badge/React%2018-TypeScript%20%2B%20Vite-3178c6)
+![Data](https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3ecf8e)
+![AI](https://img.shields.io/badge/Anthropic-Claude-d97757)
+![Tests](https://img.shields.io/badge/backend%20tests-55%20passing-brightgreen)
 
 ---
 
-## 🏗️ Architecture
+## Why this exists
 
-```mermaid
-flowchart LR
-    U([User]) -->|sign up / in| AUTH[(Supabase Auth)]
-    AUTH -->|JWT| SPA[React + Vite SPA]
-    SPA -->|Authorization: Bearer JWT| API[FastAPI]
-    API -->|verify signature via JWKS| AUTH
-    API -->|RLS-scoped queries| DB[(Postgres + RLS)]
-    API -->|categorize · insights| CLAUDE[Claude<br/>Haiku + Sonnet]
-```
+Most budgeting apps assume a US/EU financial life: dollars, credit cards, 401(k)s. That is not how money works in Peru, where daily spending runs through **Yape and Plin** mobile transfers, salaries are in **soles**, retirement savings sit in an **AFP**, and the **USD/PEN** rate matters to anyone saving or importing.
 
-**Auth flow (defense in depth):** Supabase Auth issues an asymmetric (ES256) JWT → the SPA sends it as a Bearer token → FastAPI verifies the signature per request against Supabase's public JWKS (no shared secret) → Postgres Row-Level Security scopes every query to the authenticated user. A bug in the API still can't leak another user's rows.
+AI Finance Insights is a real, deployed product built solo to fit that reality — and to serve real beta testers across Peru and the US. It pairs a hardened FastAPI + Supabase backend with a Claude assistant that reads your transactions, explains your spending, and replies in Spanish or English depending on who's asking.
 
-**Two-model AI pipeline:** a cheap, fast model (Haiku) does high-volume per-transaction labeling; a stronger model (Sonnet) does the lower-volume reasoning (the monthly narrative and flags). Right tool, right cost.
+## Features
 
-## 🧰 Tech stack
+- **AI chat & insights** — ask about your money in plain language; Claude answers grounded in your actual transactions, with a narrative recap, flags, and highlights.
+- **Auto-categorization + learned rules** — transactions are categorized automatically; correct one and the app **learns a rule** so it stays right next time.
+- **Yape/Plin receipt scanning** — snap a transfer receipt and Claude vision extracts the amount, merchant, and date into a ready-to-save transaction.
+- **Spend calendar** — a month-at-a-glance heat view of where the money went, day by day.
+- **Budgets & goals** — set category budgets with live gauges and track savings goals.
+- **AFP pension tracking** — surface pension contributions the way Peruvian users think about them.
+- **Multi-currency (PEN / USD / EUR) + FX** — hold and view balances across currencies with an up-to-date exchange rate.
+- **Bilingual ES/EN** — the UI and the AI both switch language; the assistant replies in whichever language the user is using.
+- **Dark / light mode** and a **mobile-first** layout — it's built to live on a phone.
 
-| Layer | Tech |
-|---|---|
-| Frontend | React 18, Vite, TypeScript (strict), Recharts |
-| Backend | FastAPI, Python 3.12, Pandas, PyJWT (JWKS/ES256) |
-| Data + Auth | Supabase — Postgres + Auth, Row-Level Security |
-| AI | Anthropic Claude — Haiku (categorize) + Sonnet (insights) |
+## Tech stack & architecture
 
----
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18 + TypeScript, Vite, deployed on Netlify |
+| Backend | FastAPI (Python 3.12), Uvicorn, containerized and deployed on Render |
+| Data & Auth | Supabase — Postgres, Auth, and Row-Level Security |
+| AI | Anthropic Claude (chat, insights, and vision-based receipt scanning) |
 
-## 🚀 Run it locally
+**How auth and data isolation work (JWT → FastAPI → RLS):**
+
+1. The user logs in on the React frontend via **Supabase Auth**, which issues a signed **JWT**.
+2. The frontend sends that token on every API call (`Authorization: Bearer <jwt>`).
+3. FastAPI verifies the token's signature against Supabase's published **JWKS public keys** (modern Supabase signs asymmetrically with ES256 — the backend never holds a signing secret).
+4. The backend then talks to Postgres using a **Supabase client scoped to that user's JWT**, so **Row-Level Security enforces per-user data isolation at the database layer** — even a bug in the API code cannot leak another user's rows.
+
+**AI is proxied server-side.** The Anthropic API key lives only in the backend environment — it never touches the browser. All Claude calls (chat, insights, vision) go through FastAPI, which also applies **per-user rate limiting** and a **CORS allowlist**.
+
+## Engineering highlights
+
+- **Row-Level Security** enforced in Postgres — data isolation guaranteed at the database, not just in application code.
+- **Server-side key handling** — the Anthropic key is never exposed to the client; the browser only ever calls our own API.
+- **Hardened API** — CORS origin allowlist plus in-memory per-user rate limiting (separate, stricter limits on AI endpoints).
+- **i18n architecture** — a single `X-Lang` header drives language for the natural-language AI outputs, while category keys and amounts stay language-neutral.
+- **55 backend tests** covering categorization, rules-learning, budgets, forecasting, FX, language switching, and API hardening.
+
+## Local development
+
+Two apps: a React frontend and a FastAPI backend, both talking to a Supabase project.
 
 ### 1. Supabase
-1. Create a project at [supabase.com](https://supabase.com).
-2. In the **SQL Editor**, run [`supabase/schema.sql`](supabase/schema.sql) (creates the tables + RLS policies — safe to re-run).
-3. **Authentication → Sign In / Providers → Email →** turn **off "Confirm email"** for local dev (so sign-up logs you straight in).
-4. **Settings → API Keys** → copy the **Project URL**, the **`anon`** key (backend), and the **publishable** key (frontend).
 
-### 2. Backend
+Create a Supabase project and run the schema (creates tables + Row-Level Security policies):
+
+```bash
+# In the Supabase SQL editor, run:
+supabase/schema.sql
+```
+
+### 2. Backend (FastAPI)
+
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate   # or: uv venv --python 3.12
-pip install -r requirements.txt
-cp .env.example .env        # fill in SUPABASE_URL + SUPABASE_ANON_KEY + ANTHROPIC_API_KEY
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt        # or: uv pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
-Check → http://localhost:8000/health returns `{"status":"ok"}`. Run the tests with `pytest`.
 
-### 3. Frontend
+Copy `backend/.env.example` to `backend/.env` and fill in the values (names only — never commit real secrets):
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `ANTHROPIC_API_KEY`
+- `ALLOWED_ORIGINS` (CORS allowlist — append your frontend origin in production)
+- rate-limit settings (optional; sensible defaults)
+
+### 3. Frontend (React + Vite)
+
 ```bash
 cd frontend
 npm install
-cp .env.example .env        # fill in VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY + VITE_API_BASE
 npm run dev
 ```
-Open http://localhost:5173 → sign up → import [`sample-transactions-6months.csv`](sample-transactions-6months.csv) → click **Categorize with AI** → watch the charts, insights, and forecast populate.
 
----
+Copy `frontend/.env.example` to `frontend/.env` and set:
 
-## ☁️ Deploy
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_API_BASE` (e.g. `http://localhost:8000`)
 
-The frontend (static SPA) and backend (Python API) deploy separately.
+> Deployment (Netlify frontend + Render backend + Supabase) is documented in [`DEPLOY.md`](./DEPLOY.md).
 
-### Backend → Railway (or Render)
-- **Railway:** New Project → Deploy from this repo → set the service **Root Directory** to `backend`. Railway picks up [`backend/railway.json`](backend/railway.json) / `Procfile` automatically.
-- **Render:** use the included [`render.yaml`](render.yaml) blueprint (Root Directory `backend`).
-- Set these env vars on the service:
-  | Var | Value |
-  |---|---|
-  | `SUPABASE_URL` | your project URL |
-  | `SUPABASE_ANON_KEY` | the `anon` key |
-  | `ANTHROPIC_API_KEY` | your Anthropic key (set a monthly spend cap) |
-  | `CORS_ORIGINS` | your Vercel URL, e.g. `https://your-app.vercel.app` |
-- Copy the backend's public URL (e.g. `https://…up.railway.app`).
+## Screenshots
 
-### Frontend → Vercel
-- New Project → import this repo → set **Root Directory** to `frontend` (Vercel auto-detects Vite).
-- Set env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (publishable key), and `VITE_API_BASE` = the backend URL from above.
-- Deploy, then add the resulting Vercel URL back into the backend's `CORS_ORIGINS`.
+> _Screenshots coming soon._
 
-> **Tip:** deploy the backend first so you have its URL for `VITE_API_BASE`, then deploy the frontend and feed its URL back into `CORS_ORIGINS`.
+## License
 
----
-
-## 🔌 API
-
-| Method | Route | Description |
-|---|---|---|
-| `GET` | `/health` | Liveness probe (public) |
-| `GET` | `/me` | Returns the authenticated `user_id` |
-| `POST` | `/transactions/import` | Upload a CSV of transactions |
-| `GET` | `/transactions` | List the user's transactions |
-| `POST` | `/transactions/categorize` | AI-categorize uncategorized rows (Haiku) |
-| `GET` | `/insights` | Monthly summary + narrative + flags + forecast (Sonnet) |
-
-All routes except `/health` require a valid Supabase JWT.
-
-## 🗺️ Roadmap
-
-- [x] Auth + per-user RLS
-- [x] CSV import
-- [x] AI categorization (Haiku)
-- [x] Spend-by-category + month-over-month charts
-- [x] AI insights (Sonnet) + anomaly/subscription flags
-- [x] Next-month forecast
-- [ ] Recurring-transaction detection · budget goals · multi-account support
+© 2026 Eduardo. All rights reserved. Public for portfolio/demo purposes — not licensed for reuse.
